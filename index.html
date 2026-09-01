@@ -1,0 +1,2695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Master Transaction Journal</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        /* Sign-in gate */
+        #signin-screen {
+            position: fixed; inset: 0; background-color: #fcf6f5;
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        #signin-screen .signin-box {
+            background: white; border: 1px solid #d4b8b5; border-radius: 8px;
+            padding: 40px; text-align: center; max-width: 380px;
+        }
+        #signin-screen h1 { color: #4a3b3b; margin-top: 0; }
+        #signin-screen p { color: #5c4747; font-size: 14px; }
+        #g_id_signin_container { display: flex; justify-content: center; margin-top: 15px; }
+        #signin-error { color: #d9534f; font-size: 13px; margin-top: 12px; display: none; }
+        #signed-in-as { font-size: 13px; color: #5c4747; }
+        #signed-in-as button {
+            background: none; border: none; color: #b76e79; text-decoration: underline;
+            cursor: pointer; font-size: 13px; padding: 0; margin-left: 8px;
+        }
+        #loading-banner {
+            display: none; background-color: #f3e5e4; border: 1px solid #b76e79;
+            color: #4a3b3b; padding: 8px 15px; border-radius: 4px; margin-bottom: 15px;
+            font-weight: bold; text-align: center;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #fcf6f5; /* Soft warm background */
+            color: #000000; /* Text black for clarity and function */
+        }
+        
+        /* Header Layout */
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 20px;
+        }
+        .header-container h1 {
+            margin: 0;
+            color: #4a3b3b;
+        }
+        .business-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #5c4747;
+        }
+
+        /* Tab Navigation - Bold text enabled */
+        .tab-nav {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 5px;
+        }
+        .tab-nav button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold; /* Bold tab names */
+            cursor: pointer;
+            background-color: #e8d3d1; /* Rose gold undertone */
+            border: 1px solid #d4b8b5;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            color: #333333;
+        }
+        .tab-nav button.active {
+            background-color: white;
+            font-weight: bold;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+            color: #b76e79; /* Rose gold accent */
+        }
+        
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border: 1px solid #d4b8b5;
+            border-radius: 0 4px 4px 4px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Forms & Layouts */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 10px;
+            max-width: 500px;
+            margin-bottom: 20px;
+        }
+        input, select, button, textarea {
+            padding: 7px;
+            font-size: 14px;
+            color: #000000;
+        }
+        .btn-submit {
+            grid-column: span 2;
+            padding: 10px;
+            background-color: #b76e79; /* Rose gold button */
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        .btn-submit:hover {
+            background-color: #a35d68;
+        }
+        .btn-export {
+            background-color: #c98ca3; /* Muted rose export button */
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 8px 15px;
+            border-radius: 4px;
+        }
+        
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #e2d1d0;
+            padding: 8px;
+            text-align: left;
+            color: #000000;
+        }
+        th {
+            background-color: #f4e6e5; /* Soft rose tint for table headers */
+        }
+
+        /* Bulk Action Bar */
+        .bulk-action-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #f3e5e4;
+            border: 1px solid #b76e79;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #4a3b3b;
+        }
+
+        /* Action Buttons & Modifiers */
+        .btn-edit, .btn-delete, .btn-refund, .btn-copy {
+            color: white;
+            border: none;
+            padding: 5px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-right: 2px;
+            font-size: 12px;
+        }
+        .btn-edit { background-color: #bfa19f; }
+        .btn-delete { background-color: #d9534f; }
+        .btn-refund { background-color: #f0ad4e; color: black; }
+        .btn-copy { background-color: #b76e79; }
+        
+        .refund-row {
+            text-decoration: line-through;
+            color: #777777;
+            background-color: #f2e9e8;
+        }
+        .refund-row td {
+            opacity: 0.8;
+            color: #777777;
+        }
+
+        /* Filter Controls */
+        .table-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f7eded;
+            padding: 15px;
+            border: 1px solid #d4b8b5;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .table-controls select, .table-controls input {
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+
+        /* Reports Display */
+        .report-summary-box {
+            background-color: #f3e5e4;
+            border: 1px solid #dcb5b2;
+            color: #4a2e2c;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        .report-category-title {
+            background-color: #5c4747;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px 4px 0 0;
+            margin-bottom: 0;
+            margin-top: 25px;
+        }
+
+        /* Charts Container */
+        .charts-flex-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-box {
+            flex: 1;
+            min-width: 300px;
+            background-color: #fcf8f8;
+            border: 1px solid #d4b8b5;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        .chart-box h4 {
+            margin-top: 0;
+            color: #5c4747;
+        }
+
+        /* TJ Internal Grid */
+        .internal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        .internal-section {
+            background-color: #f9f4f4;
+            padding: 15px;
+            border: 1px solid #d4b8b5;
+            border-radius: 4px;
+        }
+        .internal-list {
+            margin-top: 15px;
+            padding-left: 0;
+            list-style: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .internal-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 5px;
+            border-bottom: 1px solid #e2d1d0;
+            color: #000000;
+        }
+        
+        /* Running Totals & Projections */
+        .totals-grid {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 20px;
+        }
+
+        .total-card {
+          flex: 1;
+          padding: 20px;
+          background-color: #f8f1f0;
+          border: 1px solid #d4b8b5;
+          border-radius: 8px;
+          text-align: center;
+        }
+
+        .total-card h3 {
+          margin: 0 0 10px 0;
+          font-size: 1.1rem;
+          color: #5c4747;
+        }
+
+        .amount-display {
+          margin: 0;
+          font-size: 1.5rem;
+          font-weight: bold;
+          color: #000000;
+        }    
+
+        /* Calendar Grid for Daily Totals Overview */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 15px;
+        }
+        .calendar-header {
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            background-color: #5c4747;
+            color: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .calendar-day-card {
+            background-color: #fcf8f8;
+            border: 1px solid #e2d1d0;
+            border-radius: 6px;
+            padding: 10px 5px;
+            min-height: 55px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .calendar-day-card.empty {
+            background-color: transparent;
+            border: none;
+        }
+        .calendar-day-card.has-sales {
+            background-color: #f4e6e5;
+            border: 1px solid #b76e79;
+        }
+        .day-number {
+            font-size: 12px;
+            color: #666;
+            font-weight: bold;
+            align-self: flex-start;
+            margin-left: 4px;
+        }
+        .day-amount {
+            font-size: 14px;
+            font-weight: bold;
+            color: #4a3b3b;
+        }
+        .day-amount.zero {
+            color: #bbb;
+            font-weight: normal;
+        }
+
+        /* Customer Notes Container Layout */
+        .transaction-layout-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .customer-notes-panel {
+            flex: 1;
+            min-width: 250px;
+            max-width: 450px;
+            background-color: #fcf8f8;
+            border: 1px solid #dcb5b2;
+            border-radius: 6px;
+            padding: 15px;
+            display: none;
+        }
+        .customer-notes-panel h3 {
+            margin-top: 0;
+            color: #5c4747;
+            border-bottom: 1px solid #e2d1d0;
+            padding-bottom: 8px;
+        }
+        .customer-notes-content {
+            font-size: 14px;
+            color: #4a3b3b;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIGN-IN GATE: nothing below renders/loads until a verified @thegajerpractice.com
+         Google account signs in. The real enforcement is server-side (every API call is
+         checked by the backend's verifyRequest), this is just the matching UI gate. -->
+    <div id="signin-screen">
+        <div class="signin-box">
+            <h1>Master Transaction Journal</h1>
+            <p>Sign in with your @thegajerpractice.com Google account to continue.</p>
+            <div id="g_id_signin_container"></div>
+            <p id="signin-error"></p>
+        </div>
+    </div>
+
+    <div id="app-content" style="display: none;">
+
+    <div class="header-container">
+        <h1>Master Transaction Journal</h1>
+        <div style="text-align: right;">
+            <div class="business-name">The Gajer Practice</div>
+            <div id="signed-in-as"></div>
+        </div>
+    </div>
+
+    <div id="loading-banner">Loading...</div>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-nav">
+        <button id="btn-reports" class="active" onclick="switchTab('reports')">Reporting Overview</button>
+        <button id="btn-analytics" onclick="switchTab('analytics')">Reporting & Analytics</button>
+        <button id="btn-transactions" onclick="switchTab('transactions')">Transactions</button>
+        <button id="btn-pricing" onclick="switchTab('pricing')">Pricing & Inventory</button>
+        <button id="btn-tj-internal" onclick="switchTab('tj-internal')">TJ Internal</button>
+    </div>
+
+    <!-- TAB 1: Reporting Overview -->
+    <div id="tab-reports" class="tab-content active">
+
+        <!-- RUNNING TOTALS SECTION -->
+        <div id="running-totals-section" class="overview-section">
+          <h2>Running Totals</h2>
+          <div class="totals-grid">
+            <div class="total-card">
+              <h3>Today</h3>
+              <p id="total-today" class="amount-display">$0.00</p>
+            </div>
+            <div class="total-card">
+              <h3>This Month</h3>
+              <p id="total-month" class="amount-display">$0.00</p>
+            </div>
+            <div class="total-card">
+              <h3>This Quarter (Q<span id="current-quarter-label"></span>)</h3>
+              <p id="total-quarter" class="amount-display">$0.00</p>
+            </div>
+            <div class="total-card">
+              <h3>This Year</h3>
+              <p id="total-year" class="amount-display">$0.00</p>
+            </div>
+          </div>
+        </div>
+        
+        <br>
+
+        <!-- MONTH & QUARTER PROJECTIONS SECTION -->
+        <div id="projections-section" class="overview-section">
+          <h2>Month & Quarter Projections</h2>
+          <div class="totals-grid">
+            <div class="total-card">
+              <h3>Current Month Projection</h3>
+              <p id="proj-month" class="amount-display">$0.00</p>
+              <small id="proj-month-sub" style="color: #666; display: block; margin-top: 5px;">Based on daily average</small>
+            </div>
+            <div class="total-card">
+              <h3>Current Quarter Projection (Q<span id="proj-quarter-label"></span>)</h3>
+              <p id="proj-quarter" class="amount-display">$0.00</p>
+              <small id="proj-quarter-sub" style="color: #666; display: block; margin-top: 5px;">Based on daily average</small>
+            </div>
+          </div>
+        </div>
+
+        <br>
+
+        <!-- DAILY TOTALS OVERVIEW SECTION -->
+        <div id="daily-totals-section" class="overview-section">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Daily Totals Overview</h2>
+                <div>
+                    <label><strong>Select Month: </strong></label>
+                    <select id="daily-overview-month-filter" onchange="renderDailyTotalsOverview()">
+                    </select>
+                </div>
+            </div>
+            <div id="daily-calendar-container">
+            </div>
+        </div>
+
+        <br><hr><br>
+
+        <!-- YEARLY OVERVIEW SECTION -->
+        <div id="yearly-overview-section" class="overview-section">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Yearly Overview</h2>
+                <div>
+                    <label><strong>Select Year: </strong></label>
+                    <select id="yearly-overview-year-filter" onchange="renderYearlyOverview()">
+                    </select>
+                </div>
+            </div>
+            <div id="yearly-overview-container">
+            </div>
+        </div>
+
+        <br><hr><br>
+
+        <!-- ACTIVE CUSTOMERS SECTION -->
+        <div id="active-customers-section" class="overview-section">
+            <h2>Active Customers</h2>
+            <div class="totals-grid">
+                <div class="total-card">
+                    <h3>This Month</h3>
+                    <p id="active-month" class="amount-display">0</p>
+                </div>
+                <div class="total-card">
+                    <h3>This Quarter</h3>
+                    <p id="active-quarter" class="amount-display">0</p>
+                </div>
+                <div class="total-card">
+                    <h3>This Year</h3>
+                    <p id="active-year" class="amount-display">0</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TAB 1.5: Reporting & Analytics -->
+    <div id="tab-analytics" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin:0;">Reports</h2>
+            <button class="btn-export" onclick="exportMonthlyReportToCSV()">Export Report to Excel</button>
+        </div>
+        <p>Select a month to view revenue performance by inventory categories and visual breakdowns.</p>
+        
+        <div class="table-controls">
+            <div>
+                <label><strong>Select Month: </strong></label>
+                <select id="report-month-filter" onchange="generateMonthlyReport()">
+                </select>
+            </div>
+        </div>
+
+        <div id="report-container">
+        </div>
+    </div>
+
+    <!-- TAB 2: Transactions -->
+    <div id="tab-transactions" class="tab-content">
+        <h2 id="transaction-header">Log a Sale</h2>
+        
+        <div class="transaction-layout-container">
+            <!-- Form Grid (Left Side) -->
+            <div class="form-grid" id="transaction-form">
+                <label>Date:</label>
+                <input type="date" id="trans-date" required>
+                
+                <label>Customer Name:</label>
+                <input list="customer-options" id="trans-customer-input" placeholder="Search or select customer..." oninput="updateCustomerNotesDisplay()" required>
+                <datalist id="customer-options"></datalist>
+                
+                <label>Product:</label>
+                <input list="product-options" id="trans-product-input" placeholder="Search or select product..." oninput="updatePriceDisplay()" required>
+                <datalist id="product-options"></datalist>
+                
+                <label>Price:</label>
+                <input type="number" id="trans-price" step="0.01" oninput="calculateTotal()" readonly disabled placeholder="Auto-fills">
+                
+                <label>Quantity:</label>
+                <input type="number" id="trans-qty" step="0.01" oninput="calculateTotal()" required>            
+
+                <!-- DISCOUNT CONTROLS -->
+                <label></label>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="trans-discount-toggle" onchange="toggleDiscountFields()" style="width: auto; margin-right: 8px;">
+                    <span style="font-size: 14px;">Enable Discount</span>
+                </div>
+
+                <label class="discount-field" style="display: none;">Discount Type:</label>
+                <select id="trans-discount-type" class="discount-field" style="display: none;" onchange="updateDiscountPlaceholder(); calculateTotal();">
+                    <option value="percent">% Percentage</option>
+                    <option value="flat">$ Flat / Gift Cards</option>
+                </select>
+
+                <label class="discount-field" style="display: none;">Discount Value:</label>
+                <input type="number" id="trans-discount-val" class="discount-field" style="display: none;" step="0.01" placeholder="e.g. 10" oninput="calculateTotal()">
+
+                <!-- ADDENDUM CONTROLS -->
+                <label></label>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="trans-addendum-toggle" onchange="toggleAddendumFields()" style="width: auto; margin-right: 8px;">
+                    <span style="font-size: 14px;">Enable Addendum</span>
+                </div>
+
+                <label class="addendum-field" style="display: none;">Addendum Type:</label>
+                <select id="trans-addendum-type" class="addendum-field" style="display: none;" onchange="autoFillAddendumAmount(); calculateTotal();">
+                </select>
+
+                <label class="addendum-field" style="display: none;">Addendum Value ($):</label>
+                <input type="number" id="trans-addendum-val" class="addendum-field" style="display: none;" step="0.01" placeholder="Auto-fills from type" readonly disabled>
+
+                <!-- VIENNA CONTROL -->
+                <label></label>
+                <div style="display: flex; align-items: center;">
+                    <input type="checkbox" id="trans-vienna-toggle" style="width: auto; margin-right: 8px;">
+                    <span style="font-size: 14px;">Vienna</span>
+                </div>
+
+                <label>Total Cost ($):</label>
+                <input type="text" id="trans-total" readonly disabled placeholder="Auto-calculates">
+                
+                <label>Payment Method:</label>
+                <select id="trans-payment" required>
+                </select>
+
+                <label>Notes (Freeform):</label>
+                <input type="text" id="trans-notes">
+                
+                <button type="button" id="btn-add-transaction" class="btn-submit" onclick="addTransaction()">Log Transaction</button>
+            </div>
+
+            <!-- Notes Panel (Right Side) -->
+            <div id="customer-notes-panel" class="customer-notes-panel">
+                <h3>Customer Notes</h3>
+                <textarea id="customer-notes-content" class="customer-notes-content" style="width: 100%; height: 100px; padding: 5px; box-sizing: border-box; border: 1px solid #dcb5b2; border-radius: 4px; font-family: inherit;" placeholder="Add or edit notes here..."></textarea>
+                <button type="button" class="btn-submit" style="width: 100%; margin-top: 10px; padding: 8px; font-size: 13px;" onclick="saveCustomerNotes()">Save Notes</button>
+                <div id="save-notes-feedback" style="color: #4a3b3b; font-size: 12px; margin-top: 8px; display: none; font-weight: bold; text-align: center;">✓ Notes saved!</div>
+            </div>
+        </div>
+
+        <hr>
+
+        <h2>Transaction History</h2>
+        
+        <div class="table-controls">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div>
+                    <label><strong>Filter by Month: </strong></label>
+                    <select id="month-filter" onchange="renderTransactionTable()">
+                        <option value="ALL">All Months</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label><strong>Filter by Customer: </strong></label>
+                    <input list="customer-filter-options" id="customer-filter-input" placeholder="Search customer..." oninput="renderTransactionTable()" style="width: 180px;">
+                    <datalist id="customer-filter-options"></datalist>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <input type="file" id="import-csv-input" accept=".csv" style="display: none;" onchange="importTransactionsFromCSV(event)">
+                <button class="btn-export" onclick="document.getElementById('import-csv-input').click()" style="background-color: #5c4747; margin-bottom: 0;">Import CSV</button>
+                <button class="btn-export" onclick="exportTableToCSV('transaction-table', 'Transactions_Log.csv')" style="margin-bottom: 0;">Export View to Excel</button>
+            </div>
+        </div>
+
+        <!-- Bulk Action Bar -->
+        <div id="bulk-action-bar" class="bulk-action-bar">
+            <div><span id="selected-count">0</span> item(s) selected</div>
+            <div>
+                <button class="btn-delete" style="padding: 6px 12px; font-size: 13px;" onclick="bulkDeleteTransactions()">Delete Selected</button>
+            </div>
+        </div>
+        
+        <table id="transaction-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px; text-align: center;"><input type="checkbox" id="select-all-trans" onchange="toggleSelectAllTransactions(this)"></th>
+                    <th style="width: 90px;">TXN ID</th>
+                    <th style="width: 100px;">Date</th>
+                    <th>Location</th>
+                    <th>Customer</th>
+                    <th>Product</th>
+                    <th>Price</th>
+                    <th>Qty</th>
+                    <th>Discount</th>
+                    <th>Addendum</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Notes</th>
+                    <th style="width: 230px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TAB 3: Pricing & Inventory -->
+    <div id="tab-pricing" class="tab-content">
+        <h2 id="pricing-header">Add to Inventory</h2>
+        <div class="form-grid" id="pricing-form">
+            <label>Item Name:</label>
+            <input type="text" id="inv-name" required>
+            
+            <label>Category:</label>
+            <select id="inv-category" required>
+            </select>
+
+            <label>Sold By:</label>
+            <select id="inv-unit">
+                <option value="/each">/each</option>
+                <option value="/mg">/mg</option>
+                <option value="/quote">/quote</option>
+            </select>
+            
+            <label>Price ($):</label>
+            <input type="number" id="inv-price" step="0.01" required placeholder="Base price (or 0)">
+            
+            <button type="button" id="btn-add-pricing" class="btn-submit" onclick="addOrUpdatePricingItem()">Add Item</button>
+        </div>
+
+        <hr>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="margin: 0;">Pricing and Inventory List</h2>
+            <div style="display: flex; gap: 10px;">
+                <input type="file" id="import-pricing-input" accept=".csv" style="display: none;" onchange="importPricingFromCSV(event)">
+                <button class="btn-export" onclick="document.getElementById('import-pricing-input').click()" style="background-color: #5c4747;">Import CSV</button>
+                <button class="btn-export" onclick="exportTableToCSV('pricing-table', 'Pricing_Sheet.csv')">Export to Excel (CSV)</button>
+            </div>
+        </div>
+
+        <table id="pricing-table">
+            <thead>
+                <tr>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th>Sold By</th>
+                    <th>Price</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- TAB 4: TJ Internal -->
+    <div id="tab-tj-internal" class="tab-content">
+        <h2>Internal Settings</h2>
+        <p>Manage the dropdown lists used in the other tabs here. <em>(Note: Editing or deleting these won't alter past transactions.)</em></p>
+        
+        <div class="internal-grid">
+            <!-- Categories Section -->
+            <div class="internal-section">
+                <h3>Categories</h3>
+                <div style="display:flex; gap:5px; margin-bottom: 8px;">
+                    <input type="text" id="new-category" placeholder="New Category" style="width: 100%;">
+                    <button onclick="addSimpleInternalItem('categories', 'new-category')">Add</button>
+                </div>
+                <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                    <input type="file" id="import-categories-input" accept=".csv" style="display:none;" onchange="importInternalCSV('categories', event)">
+                    <button onclick="document.getElementById('import-categories-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
+                    <button onclick="exportInternalCSV('categories')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
+                </div>
+                <ul id="category-list" class="internal-list"></ul>
+            </div>
+
+            <!-- Customers Section -->
+            <div class="internal-section">
+                <h3>Customers</h3>
+                <div style="display:flex; gap:5px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <input type="text" id="new-customer" placeholder="Customer Name" style="flex: 1;">
+                    <input type="text" id="new-customer-dob" placeholder="MM/DD/YYYY" style="width: 100px;">
+                    <textarea id="new-customer-notes" placeholder="Notes (Optional)" style="width: 100%; margin-top: 5px; box-sizing: border-box;" rows="2"></textarea>
+                    <button onclick="addCustomer()" style="width: 100%; margin-top: 5px;">Add</button>
+                </div>
+                <div style="display:flex; gap:5px; margin-bottom: 8px;">
+                    <input type="text" id="search-customer-internal" placeholder="🔍 Search customers..." oninput="renderInternalLists()" style="width: 100%; box-sizing: border-box;">
+                </div>
+                <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                    <input type="file" id="import-customers-input" accept=".csv" style="display:none;" onchange="importInternalCSV('customers', event)">
+                    <button onclick="document.getElementById('import-customers-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
+                    <button onclick="exportInternalCSV('customers')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
+                </div>
+                <ul id="customer-list" class="internal-list"></ul>
+            </div>
+
+            <!-- Payment Methods Section -->
+            <div class="internal-section">
+                <h3>Payment Methods</h3>
+                <div style="display:flex; gap:5px; margin-bottom: 8px;">
+                    <input type="text" id="new-payment" placeholder="New Method" style="width: 100%;">
+                    <button onclick="addSimpleInternalItem('payments', 'new-payment')">Add</button>
+                </div>
+                <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                    <input type="file" id="import-payments-input" accept=".csv" style="display:none;" onchange="importInternalCSV('payments', event)">
+                    <button onclick="document.getElementById('import-payments-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
+                    <button onclick="exportInternalCSV('payments')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
+                </div>
+                <ul id="payment-list" class="internal-list"></ul>
+            </div>
+
+            <!-- Addendums Section -->
+            <div class="internal-section">
+                <h3>Addendums (Extra Fees)</h3>
+                <div style="display:flex; gap:5px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <input type="text" id="new-addendum-name" placeholder="Fee Name (e.g. Booking Fee)" style="flex: 1;">
+                    <input type="number" id="new-addendum-amount" placeholder="Amount ($)" step="0.01" style="width: 90px;">
+                    <button onclick="addAddendum()">Add</button>
+                </div>
+                <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                    <input type="file" id="import-addendums-input" accept=".csv" style="display:none;" onchange="importInternalCSV('addendums', event)">
+                    <button onclick="document.getElementById('import-addendums-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
+                    <button onclick="exportInternalCSV('addendums')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
+                </div>
+                <ul id="addendum-list" class="internal-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- /#app-content -->
+
+    <script>
+        // --- STATE VARIABLES ---
+        let inventory = [];
+        let transactions = [];
+        let editingInventoryIndex = -1;
+        let editingTransactionId = null;
+        let selectedTransactionIds = new Set();
+
+        let internalData = {
+            categories: [],
+            customers: [],
+            payments: [],
+            addendums: []
+        };
+
+        function generateId() {
+            return 'TXN-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // --- GOOGLE SIGN-IN + DOMAIN LOCK ---
+        // This client ID is intentionally public (OAuth web client IDs are not
+        // secrets) — it's the same one the quoting app uses, so both tools sit
+        // under one Google Cloud project and one sign-in flow. The actual
+        // access control is NOT here; it's server-side in every function's
+        // verifyRequest() call, which only accepts a Google-signed token for an
+        // @thegajerpractice.com account. Nothing in this file could bypass that,
+        // because the token has to come from Google itself.
+        const GOOGLE_CLIENT_ID = "41336479862-bokl63btclq773c42i0ngju7gonqp9p2.apps.googleusercontent.com";
+        let idToken = localStorage.getItem('tj_id_token') || null;
+        let currentUser = null;
+        try { currentUser = JSON.parse(localStorage.getItem('tj_auth_profile') || 'null'); } catch(e) { currentUser = null; }
+
+        function initGoogleSignIn() {
+            if (window.google && window.google.accounts && window.google.accounts.id) {
+                google.accounts.id.initialize({
+                    client_id: GOOGLE_CLIENT_ID,
+                    callback: handleCredentialResponse,
+                });
+                const container = document.getElementById('g_id_signin_container');
+                if (container) {
+                    google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', text: 'signin_with' });
+                }
+            } else {
+                setTimeout(initGoogleSignIn, 200);
+            }
+        }
+
+        function handleCredentialResponse(response) {
+            const token = response.credential;
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                idToken = token;
+                currentUser = { email: payload.email, name: payload.name || payload.email };
+                localStorage.setItem('tj_id_token', token);
+                localStorage.setItem('tj_auth_profile', JSON.stringify(currentUser));
+                document.getElementById('signin-error').style.display = 'none';
+                enterApp();
+            } catch (e) {
+                showSigninError("Something went wrong signing in. Please try again.");
+            }
+        }
+
+        function showSigninError(message) {
+            const el = document.getElementById('signin-error');
+            el.innerText = message;
+            el.style.display = 'block';
+        }
+
+        function signOut() {
+            idToken = null;
+            currentUser = null;
+            localStorage.removeItem('tj_id_token');
+            localStorage.removeItem('tj_auth_profile');
+            try { google.accounts.id.disableAutoSelect(); } catch (e) {}
+            document.getElementById('app-content').style.display = 'none';
+            document.getElementById('signin-screen').style.display = 'flex';
+        }
+
+        function enterApp() {
+            document.getElementById('signin-screen').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            const label = document.getElementById('signed-in-as');
+            if (currentUser) {
+                label.innerHTML = `Signed in as ${currentUser.name} <button onclick="signOut()">Sign out</button>`;
+            }
+            document.getElementById('trans-date').valueAsDate = new Date();
+            loadAllData();
+        }
+
+        // --- API LAYER (replaces localStorage as the source of truth, so
+        // Burke and Vienna share one live dataset instead of each browser
+        // keeping its own separate copy) ---
+        const API_BASE = '/api';
+
+        async function apiFetch(path, opts = {}) {
+            if (!idToken) throw new Error("Please sign in with Google first.");
+            const res = await fetch(`${API_BASE}${path}`, {
+                ...opts,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(opts.headers || {}),
+                    'Authorization': `Bearer ${idToken}`,
+                },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) {
+                signOut();
+                throw new Error("Your session expired — please sign in again.");
+            }
+            if (!res.ok) {
+                throw new Error(data.error || `Request failed (${res.status})`);
+            }
+            return data;
+        }
+
+        function setLoadingState(isLoading) {
+            document.getElementById('loading-banner').style.display = isLoading ? 'block' : 'none';
+        }
+
+        async function loadAllData() {
+            setLoadingState(true);
+            try {
+                const [invRes, transRes, custRes, catRes, payRes, addRes] = await Promise.all([
+                    apiFetch('/inventory'),
+                    apiFetch('/transactions'),
+                    apiFetch('/customers'),
+                    apiFetch('/lists?type=categories'),
+                    apiFetch('/lists?type=payments'),
+                    apiFetch('/lists?type=addendums'),
+                ]);
+                inventory = invRes.inventory;
+                transactions = transRes.transactions;
+                internalData.customers = custRes.customers;
+                internalData.categories = catRes.items;
+                internalData.payments = payRes.items;
+                internalData.addendums = addRes.items;
+
+                sortInventory();
+                sortTransactions();
+                renderPricingTable();
+                renderInternalLists();
+                updateAllDropdowns();
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+            } catch (e) {
+                alert("Could not load data from the shared sheet: " + e.message);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // saveData() used to write everything to localStorage after every change.
+        // It's kept as a no-op stub (rather than removed) so every existing call
+        // site below still works untouched — persistence now happens per-action,
+        // immediately, via the API calls each function makes to the backend.
+        function saveData() { /* no-op: data is now saved to the Sheet per-action */ }
+
+        // --- INITIALIZATION ---
+        initGoogleSignIn();
+        if (idToken && currentUser) {
+            // A token from a previous visit — show the app optimistically; if
+            // it's actually expired, the first API call's 401 will send the
+            // user back to the sign-in screen via apiFetch()'s own check.
+            enterApp();
+        }
+
+        // --- TAB SWITCHING ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-nav button').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById('tab-' + tabName).classList.add('active');
+            document.getElementById('btn-' + tabName).classList.add('active');
+
+            if (tabName === 'reports') {
+                updateRunningTotals();
+                renderDailyTotalsOverview();
+                renderYearlyOverview();
+            } else if (tabName === 'analytics') {
+                generateMonthlyReport();
+            }
+        }
+
+        // --- CUSTOMER NOTES DISPLAY IN TRANSACTIONS ---
+        function updateCustomerNotesDisplay() {
+            const inputVal = document.getElementById('trans-customer-input').value.trim();
+            const notesPanel = document.getElementById('customer-notes-panel');
+            const notesContent = document.getElementById('customer-notes-content');
+
+            if (inputVal === "") {
+                notesPanel.style.display = "none";
+                notesContent.value = "";
+                return;
+            }
+
+            const customer = internalData.customers.find(c => c.name.toLowerCase() === inputVal.toLowerCase());
+            
+            if (customer) {
+                notesPanel.style.display = "block";
+                notesContent.value = customer.notes || "";
+            } else {
+                notesPanel.style.display = "none";
+                notesContent.value = "";
+            }
+        }
+
+        async function saveCustomerNotes() {
+            const inputVal = document.getElementById('trans-customer-input').value.trim();
+            const newNotes = document.getElementById('customer-notes-content').value;
+
+            const customerIndex = internalData.customers.findIndex(c => c.name.toLowerCase() === inputVal.toLowerCase());
+
+            if (customerIndex === -1) {
+                alert("Customer not found. Please select a valid customer first.");
+                return;
+            }
+
+            const c = internalData.customers[customerIndex];
+            try {
+                const saved = await apiFetch('/customers', { method: 'PATCH', body: JSON.stringify({ originalName: c.name, name: c.name, dob: c.dob, notes: newNotes }) });
+                internalData.customers[customerIndex] = saved;
+                renderInternalLists();
+
+                const feedback = document.getElementById('save-notes-feedback');
+                feedback.style.display = 'block';
+                setTimeout(() => {
+                    feedback.style.display = 'none';
+                }, 2500);
+            } catch (e) {
+                alert("Could not save notes: " + e.message);
+            }
+        }
+
+        // --- TJ INTERNAL LOGIC ---
+        // "categories" and "payments" are simple string lists stored via /api/lists;
+        // "customers" and "addendums" have their own endpoints/shapes below.
+        async function addSimpleInternalItem(listName, inputId) {
+            const val = document.getElementById(inputId).value.trim();
+            if (!val || internalData[listName].includes(val)) return;
+
+            try {
+                const saved = await apiFetch(`/lists?type=${listName}`, { method: 'POST', body: JSON.stringify({ value: val }) });
+                internalData[listName].push(saved.value);
+                document.getElementById(inputId).value = '';
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not add this item: " + e.message);
+            }
+        }
+
+        async function editSimpleInternalItem(listName, index) {
+            const oldVal = internalData[listName][index];
+            const displayTitle = listName.substring(0, listName.length - 1);
+            const newVal = prompt(`Edit ${displayTitle}:`, oldVal);
+
+            if (newVal === null || newVal.trim() === "") return;
+
+            try {
+                const saved = await apiFetch(`/lists?type=${listName}`, { method: 'PATCH', body: JSON.stringify({ oldValue: oldVal, newValue: newVal.trim() }) });
+                internalData[listName][index] = saved.value;
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not update this item: " + e.message);
+            }
+        }
+
+        async function deleteInternalItem(listName, index) {
+            if (!confirm("Are you sure you want to delete this?")) return;
+            const item = internalData[listName][index];
+
+            try {
+                if (listName === 'customers') {
+                    await apiFetch('/customers', { method: 'DELETE', body: JSON.stringify({ name: item.name }) });
+                } else if (listName === 'addendums') {
+                    await apiFetch('/lists?type=addendums', { method: 'DELETE', body: JSON.stringify({ name: item.name }) });
+                } else {
+                    await apiFetch(`/lists?type=${listName}`, { method: 'DELETE', body: JSON.stringify({ value: item }) });
+                }
+                internalData[listName].splice(index, 1);
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not delete this: " + e.message);
+            }
+        }
+
+        async function addCustomer() {
+            const name = document.getElementById('new-customer').value.trim();
+            const dob = document.getElementById('new-customer-dob').value.trim() || "N/A";
+            const notes = document.getElementById('new-customer-notes').value.trim();
+            if (!name) return;
+
+            try {
+                const saved = await apiFetch('/customers', { method: 'POST', body: JSON.stringify({ name, dob, notes }) });
+                internalData.customers.push(saved);
+                document.getElementById('new-customer').value = '';
+                document.getElementById('new-customer-dob').value = '';
+                document.getElementById('new-customer-notes').value = '';
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function editCustomer(index) {
+            const c = internalData.customers[index];
+            const newName = prompt("Edit Customer Name:", c.name);
+            if(newName === null) return;
+
+            const newDob = prompt("Edit Customer DOB (MM/DD/YYYY):", c.dob);
+            if(newDob === null) return;
+
+            const newNotes = prompt("Edit Customer Notes:", c.notes || "");
+            if(newNotes === null) return;
+
+            try {
+                const saved = await apiFetch('/customers', { method: 'PATCH', body: JSON.stringify({
+                    originalName: c.name,
+                    name: newName.trim(),
+                    dob: newDob.trim() || "N/A",
+                    notes: newNotes.trim(),
+                }) });
+                internalData.customers[index] = saved;
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not update customer: " + e.message);
+            }
+        }
+
+        async function addAddendum() {
+            const name = document.getElementById('new-addendum-name').value.trim();
+            const amountVal = parseFloat(document.getElementById('new-addendum-amount').value);
+            const amount = isNaN(amountVal) ? 0 : amountVal;
+
+            if(!name) {
+                alert("Please enter a name for the fee.");
+                return;
+            }
+
+            try {
+                const saved = await apiFetch('/lists?type=addendums', { method: 'POST', body: JSON.stringify({ name, amount }) });
+                internalData.addendums.push(saved);
+                document.getElementById('new-addendum-name').value = '';
+                document.getElementById('new-addendum-amount').value = '';
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+
+        async function editAddendum(index) {
+            const a = internalData.addendums[index];
+            const newName = prompt("Edit Addendum Name:", a.name);
+            if (newName === null) return;
+
+            const newAmountStr = prompt("Edit Default Amount ($):", a.amount.toFixed(2));
+            if (newAmountStr === null) return;
+
+            const newAmount = parseFloat(newAmountStr);
+
+            try {
+                const saved = await apiFetch('/lists?type=addendums', { method: 'PATCH', body: JSON.stringify({
+                    originalName: a.name,
+                    name: newName.trim(),
+                    amount: isNaN(newAmount) ? 0 : newAmount,
+                }) });
+                internalData.addendums[index] = saved;
+                renderInternalLists();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not update addendum: " + e.message);
+            }
+        }
+
+        function renderInternalLists() {
+            const catList = document.getElementById('category-list');
+            catList.innerHTML = internalData.categories.map((c, index) => 
+                `<li>${c} 
+                    <div>
+                        <button class="btn-edit" onclick="editSimpleInternalItem('categories', ${index})">Edit</button>
+                        <button class="btn-delete" onclick="deleteInternalItem('categories', ${index})">X</button>
+                    </div>
+                </li>`
+            ).join('');
+
+            const custList = document.getElementById('customer-list');
+            const searchInput = document.getElementById('search-customer-internal');
+            const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+            const filtered = internalData.customers
+                .map((c, index) => ({ ...c, originalIndex: index }))
+                .filter(c => !query || c.name.toLowerCase().includes(query) || (c.dob && c.dob.toLowerCase().includes(query)));
+
+            const limit = 50;
+            const visible = filtered.slice(0, limit);
+
+            let custHTML = visible.map(c => {
+                let display = c.dob !== "N/A" ? `${c.name} <small>(${c.dob})</small>` : c.name;
+                return `<li><span>${display}</span> 
+                    <div>
+                        <button class="btn-edit" onclick="editCustomer(${c.originalIndex})">Edit</button>
+                        <button class="btn-delete" onclick="deleteInternalItem('customers', ${c.originalIndex})">X</button>
+                    </div>
+                </li>`;
+            }).join('');
+
+            if (filtered.length > limit) {
+                custHTML += `<li style="justify-content: center; color: #777; font-style: italic; background-color: #f2e9e8;">Showing top ${limit} of ${filtered.length} matches. Use search above to find others.</li>`;
+            }
+
+            custList.innerHTML = custHTML;
+
+            const payList = document.getElementById('payment-list');
+            payList.innerHTML = internalData.payments.map((p, index) => 
+                `<li>${p} 
+                    <div>
+                        <button class="btn-edit" onclick="editSimpleInternalItem('payments', ${index})">Edit</button>
+                        <button class="btn-delete" onclick="deleteInternalItem('payments', ${index})">X</button>
+                    </div>
+                </li>`
+            ).join('');
+
+            const addList = document.getElementById('addendum-list');
+            addList.innerHTML = internalData.addendums.map((a, index) => 
+                `<li><span>${a.name} <strong>($${a.amount.toFixed(2)})</strong></span> 
+                    <div>
+                        <button class="btn-edit" onclick="editAddendum(${index})">Edit</button>
+                        <button class="btn-delete" onclick="deleteInternalItem('addendums', ${index})">X</button>
+                    </div>
+                </li>`
+            ).join('');
+        }
+
+        function exportInternalCSV(type) {
+            let csvContent = "";
+            let filename = `${type}_export.csv`;
+
+            if (type === 'categories') {
+                csvContent = "Category\n" + internalData.categories.map(c => `"${c.replace(/"/g, '""')}"`).join("\n");
+            } else if (type === 'customers') {
+                csvContent = "Customer Name,DOB,Notes\n" + internalData.customers.map(c => `"${c.name.replace(/"/g, '""')}","${c.dob.replace(/"/g, '""')}","${(c.notes || '').replace(/"/g, '""')}"`).join("\n");
+            } else if (type === 'payments') {
+                csvContent = "Payment Method\n" + internalData.payments.map(p => `"${p.replace(/"/g, '""')}"`).join("\n");
+            } else if (type === 'addendums') {
+                csvContent = "Addendum Name,Default Amount\n" + internalData.addendums.map(a => `"${a.name.replace(/"/g, '""')}","${a.amount.toFixed(2)}"`).join("\n");
+            }
+
+            downloadCSV(csvContent, filename);
+        }
+
+        function importInternalCSV(type, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(r => r.trim().length > 0);
+
+                // Collect candidates first, skipping anything already present —
+                // same "skip if exists" semantics as before, just checked
+                // against a running list so two identical rows in one CSV
+                // don't both queue up.
+                const candidates = [];
+                const seenKeys = new Set();
+
+                for (let i = 1; i < rows.length; i++) {
+                    const rowText = rows[i];
+                    let inQuotes = false;
+                    let currentVal = '';
+                    let parsedCols = [];
+
+                    for (let j = 0; j < rowText.length; j++) {
+                        const char = rowText[j];
+                        if (char === '"' && rowText[j+1] === '"' && inQuotes) {
+                            currentVal += '"';
+                            j++;
+                        } else if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            parsedCols.push(currentVal);
+                            currentVal = '';
+                        } else {
+                            currentVal += char;
+                        }
+                    }
+                    parsedCols.push(currentVal);
+
+                    if (type === 'categories' || type === 'payments') {
+                        const val = parsedCols[0] ? parsedCols[0].replace(/^"|"$/g, '').trim() : '';
+                        const key = val.toLowerCase();
+                        if (val && !internalData[type].some(v => v.toLowerCase() === key) && !seenKeys.has(key)) {
+                            seenKeys.add(key);
+                            candidates.push({ value: val });
+                        }
+                    } else if (type === 'customers') {
+                        const name = parsedCols[0] ? parsedCols[0].replace(/^"|"$/g, '').trim() : '';
+                        const dob = parsedCols[1] ? parsedCols[1].replace(/^"|"$/g, '').trim() : 'N/A';
+                        const notes = parsedCols[2] ? parsedCols[2].replace(/^"|"$/g, '').trim() : '';
+                        const key = name.toLowerCase();
+                        if (name && !internalData.customers.some(c => c.name.toLowerCase() === key) && !seenKeys.has(key)) {
+                            seenKeys.add(key);
+                            candidates.push({ name, dob: dob || 'N/A', notes });
+                        }
+                    } else if (type === 'addendums') {
+                        const name = parsedCols[0] ? parsedCols[0].replace(/^"|"$/g, '').trim() : '';
+                        const rawAmt = parsedCols[1] ? parsedCols[1].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim() : '0';
+                        const amount = parseFloat(rawAmt) || 0;
+                        const key = name.toLowerCase();
+                        if (name && !internalData.addendums.some(a => a.name.toLowerCase() === key) && !seenKeys.has(key)) {
+                            seenKeys.add(key);
+                            candidates.push({ name, amount });
+                        }
+                    }
+                }
+
+                let count = 0;
+                for (const candidate of candidates) {
+                    try {
+                        if (type === 'categories' || type === 'payments') {
+                            const saved = await apiFetch(`/lists?type=${type}`, { method: 'POST', body: JSON.stringify(candidate) });
+                            internalData[type].push(saved.value);
+                        } else if (type === 'customers') {
+                            const saved = await apiFetch('/customers', { method: 'POST', body: JSON.stringify(candidate) });
+                            internalData.customers.push(saved);
+                        } else if (type === 'addendums') {
+                            const saved = await apiFetch('/lists?type=addendums', { method: 'POST', body: JSON.stringify(candidate) });
+                            internalData.addendums.push(saved);
+                        }
+                        count++;
+                    } catch (err) {
+                        // Skip and continue — matches the original's "skip if it doesn't fit" behavior.
+                    }
+                }
+
+                renderInternalLists();
+                updateAllDropdowns();
+                alert(`Successfully imported ${count} item(s) into ${type}.`);
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function updateAllDropdowns() {
+            const catSelect = document.getElementById('inv-category');
+            catSelect.innerHTML = '<option value="">-- Select Category --</option>' + 
+                internalData.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            const custOptions = document.getElementById('customer-options');
+            custOptions.innerHTML = internalData.customers.map(c => {
+                let dobText = c.dob !== "N/A" ? ` (DOB: ${c.dob})` : '';
+                return `<option value="${c.name}">${c.name}${dobText}</option>`;
+            }).join('');
+
+            const paySelect = document.getElementById('trans-payment');
+            paySelect.innerHTML = '<option value="">-- Select Payment --</option>' + 
+                internalData.payments.map(p => `<option value="${p}">${p}</option>`).join('');
+                
+            const addSelect = document.getElementById('trans-addendum-type');
+            addSelect.innerHTML = '<option value="">-- Select Fee Type --</option>' + 
+                internalData.addendums.map(a => `<option value="${a.name}">${a.name} ($${a.amount.toFixed(2)})</option>`).join('');
+
+            const prodOptions = document.getElementById('product-options');
+            prodOptions.innerHTML = inventory.map(item => 
+                `<option value="${item.name}">${item.name} ($${item.price.toFixed(2)} ${item.unit}) - ${item.category}</option>`
+            ).join('');
+        }
+
+        // --- PRICING & INVENTORY LOGIC ---
+        function sortInventory() {
+            inventory.sort((a, b) => {
+                if (a.category.toLowerCase() < b.category.toLowerCase()) return -1;
+                if (a.category.toLowerCase() > b.category.toLowerCase()) return 1;
+                if (a.name.toLowerCase() < b.name.toLowerCase()) return -1;
+                if (a.name.toLowerCase() > b.name.toLowerCase()) return 1;
+                return 0;
+            });
+        }
+
+        async function addOrUpdatePricingItem() {
+            const name = document.getElementById('inv-name').value;
+            const category = document.getElementById('inv-category').value;
+            const unit = document.getElementById('inv-unit').value;
+            const price = parseFloat(document.getElementById('inv-price').value);
+
+            if (!name || !category || isNaN(price)) {
+                alert("Please fill out all fields and enter a valid price.");
+                return;
+            }
+
+            const isEditing = editingInventoryIndex >= 0;
+            const payload = { name, category, unit, price };
+            if (isEditing) {
+                payload.originalName = inventory[editingInventoryIndex].name;
+            } else if (inventory.some(i => i.name.toLowerCase() === name.toLowerCase())) {
+                alert("An item with this exact name already exists.");
+                return;
+            }
+
+            try {
+                const saved = await apiFetch('/inventory', { method: 'POST', body: JSON.stringify(payload) });
+
+                if (isEditing) {
+                    inventory[editingInventoryIndex] = saved;
+                    editingInventoryIndex = -1;
+
+                    const btn = document.getElementById('btn-add-pricing');
+                    btn.innerText = "Add Item";
+                    btn.style.backgroundColor = "#b76e79";
+                    btn.style.color = "white";
+                    document.getElementById('pricing-header').innerText = "Add to Inventory";
+                } else {
+                    inventory.push(saved);
+                }
+
+                document.getElementById('inv-name').value = '';
+                document.getElementById('inv-price').value = '';
+
+                sortInventory();
+                renderPricingTable();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not save this item: " + e.message);
+            }
+        }
+
+        function editPricingItem(index) {
+            editingInventoryIndex = index;
+            const item = inventory[index];
+            
+            document.getElementById('inv-name').value = item.name;
+            document.getElementById('inv-category').value = item.category;
+            document.getElementById('inv-unit').value = item.unit;
+            document.getElementById('inv-price').value = item.price;
+            
+            document.getElementById('pricing-header').innerText = "Editing Item...";
+            const btn = document.getElementById('btn-add-pricing');
+            btn.innerText = "Save Updates";
+            btn.style.backgroundColor = "#f0ad4e";
+            btn.style.color = "black";
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function deletePricingItem(index) {
+            if (!confirm("Are you sure you want to delete this pricing item?")) return;
+            const name = inventory[index].name;
+            try {
+                await apiFetch('/inventory', { method: 'DELETE', body: JSON.stringify({ name }) });
+                inventory.splice(index, 1);
+                renderPricingTable();
+                updateAllDropdowns();
+            } catch (e) {
+                alert("Could not delete this item: " + e.message);
+            }
+        }
+
+        function renderPricingTable() {
+            const tbody = document.querySelector('#pricing-table tbody');
+            tbody.innerHTML = inventory.map((item, index) => 
+                `<tr>
+                    <td>${item.name}</td>
+                    <td>${item.category}</td>
+                    <td>${item.unit}</td>
+                    <td>$${item.price.toFixed(2)}</td>
+                    <td>
+                        <button class="btn-edit" onclick="editPricingItem(${index})">Edit</button>
+                        <button class="btn-delete" onclick="deletePricingItem(${index})">X</button>
+                    </td>
+                </tr>`
+            ).join('');
+        }
+
+        function importPricingFromCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim().length > 0);
+
+                const parsedItems = [];
+                const newCategoriesSeen = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const rowText = rows[i];
+                    let inQuotes = false;
+                    let currentVal = '';
+                    let parsedCols = [];
+
+                    for (let j = 0; j < rowText.length; j++) {
+                        const char = rowText[j];
+                        if (char === '"' && rowText[j+1] === '"' && inQuotes) {
+                            currentVal += '"';
+                            j++;
+                        } else if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            parsedCols.push(currentVal);
+                            currentVal = '';
+                        } else {
+                            currentVal += char;
+                        }
+                    }
+                    parsedCols.push(currentVal);
+
+                    if (parsedCols.length >= 3) {
+                        const name = parsedCols[0].replace(/^"|"$/g, '').trim();
+                        const category = parsedCols[1].replace(/^"|"$/g, '').trim();
+
+                        let unit = '/each';
+                        let rawPrice = '';
+
+                        if (parsedCols.length >= 4) {
+                            unit = parsedCols[2].replace(/^"|"$/g, '').trim();
+                            rawPrice = parsedCols[3].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim();
+                        } else {
+                            rawPrice = parsedCols[2].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim();
+                        }
+
+                        const price = parseFloat(rawPrice) || 0;
+
+                        if (name) {
+                            if (unit && !unit.startsWith('/')) unit = '/' + unit;
+                            if (!unit) unit = '/each';
+
+                            if (category && !internalData.categories.includes(category) && !newCategoriesSeen.includes(category)) {
+                                newCategoriesSeen.push(category);
+                            }
+
+                            parsedItems.push({ name, category: category || 'General', unit, price });
+                        }
+                    }
+                }
+
+                // New categories first, so the items below can reference them.
+                for (const category of newCategoriesSeen) {
+                    try {
+                        const saved = await apiFetch('/lists?type=categories', { method: 'POST', body: JSON.stringify({ value: category }) });
+                        internalData.categories.push(saved.value);
+                    } catch (err) {
+                        // Another concurrent import may have already added it — safe to ignore and continue.
+                    }
+                }
+
+                let importedCount = 0;
+                let updatedCount = 0;
+                let failedCount = 0;
+
+                for (const item of parsedItems) {
+                    const existing = inventory.find(i => i.name.toLowerCase() === item.name.toLowerCase());
+                    const payload = existing ? { ...item, originalName: existing.name } : item;
+                    try {
+                        const saved = await apiFetch('/inventory', { method: 'POST', body: JSON.stringify(payload) });
+                        const idx = inventory.findIndex(i => i.name.toLowerCase() === (existing ? existing.name.toLowerCase() : item.name.toLowerCase()));
+                        if (idx >= 0) inventory[idx] = saved; else inventory.push(saved);
+                        if (existing) updatedCount++; else importedCount++;
+                    } catch (err) {
+                        failedCount++;
+                    }
+                }
+
+                sortInventory();
+                renderPricingTable();
+                renderInternalLists();
+                updateAllDropdowns();
+
+                alert(`Successfully processed. Imported: ${importedCount} | Updated: ${updatedCount}${failedCount ? ` | Failed: ${failedCount}` : ''}`);
+                event.target.value = "";
+            };
+
+            reader.readAsText(file);
+        }
+
+        // --- TRANSACTION, DISCOUNT & ADDENDUM LOGIC ---
+        function toggleDiscountFields() {
+            const isChecked = document.getElementById('trans-discount-toggle').checked;
+            const discountFields = document.querySelectorAll('.discount-field');
+            discountFields.forEach(el => el.style.display = isChecked ? 'block' : 'none');
+            
+            if (!isChecked) {
+                document.getElementById('trans-discount-val').value = '';
+            }
+            updateDiscountPlaceholder();
+            calculateTotal();
+        }
+
+        function updateDiscountPlaceholder() {
+            const type = document.getElementById('trans-discount-type').value;
+            const input = document.getElementById('trans-discount-val');
+            if (type === 'percent') {
+                input.placeholder = "e.g. 10 (for 10%)";
+            } else {
+                input.placeholder = "e.g. 15.00 (Flat $)";
+            }
+        }
+        
+        function toggleAddendumFields() {
+            const isChecked = document.getElementById('trans-addendum-toggle').checked;
+            const fields = document.querySelectorAll('.addendum-field');
+            fields.forEach(el => el.style.display = isChecked ? 'block' : 'none');
+            
+            if (!isChecked) {
+                document.getElementById('trans-addendum-val').value = '';
+                document.getElementById('trans-addendum-type').value = '';
+            }
+            calculateTotal();
+        }
+
+        function autoFillAddendumAmount() {
+            const selectedName = document.getElementById('trans-addendum-type').value;
+            const valInput = document.getElementById('trans-addendum-val');
+            
+            const match = internalData.addendums.find(a => a.name === selectedName);
+            if (match) {
+                valInput.value = match.amount.toFixed(2);
+            } else {
+                valInput.value = '';
+            }
+        }
+
+        function sortTransactions() {
+            transactions.sort((a, b) => {
+                if (a.date > b.date) return -1;
+                if (a.date < b.date) return 1;
+                if (a.customer.toLowerCase() < b.customer.toLowerCase()) return -1;
+                if (a.customer.toLowerCase() > b.customer.toLowerCase()) return 1;
+                return 0;
+            });
+        }
+
+        function updateFilters() {
+            const transMonthFilter = document.getElementById('month-filter');
+            const reportFilter = document.getElementById('report-month-filter');
+            const dailyFilter = document.getElementById('daily-overview-month-filter');
+            const yearFilter = document.getElementById('yearly-overview-year-filter');
+            
+            const currentTransMonth = transMonthFilter.value;
+            const currentReportSelection = reportFilter ? reportFilter.value : "";
+            const currentDailySelection = dailyFilter ? dailyFilter.value : "";
+            const currentYearSelection = yearFilter ? yearFilter.value : "";
+            
+            transMonthFilter.innerHTML = '<option value="ALL">All Months</option>';
+            if (reportFilter) reportFilter.innerHTML = ''; 
+            if (dailyFilter) dailyFilter.innerHTML = '';
+            if (yearFilter) yearFilter.innerHTML = '';
+            
+            const months = [...new Set(transactions.map(t => t.date ? t.date.substring(0, 7) : 'Invalid Date'))];
+            const years = [...new Set(transactions.map(t => t.date ? t.date.substring(0, 4) : 'Invalid Date'))];
+
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const currentYearStr = `${now.getFullYear()}`;
+
+            if (!months.includes(currentMonthStr)) months.push(currentMonthStr);
+            if (!years.includes(currentYearStr)) years.push(currentYearStr);
+
+            months.sort((a, b) => b.localeCompare(a));
+            years.sort((a, b) => b.localeCompare(a));
+
+            months.forEach(m => {
+                let monthName = m;
+                if (m !== 'Invalid Date' && m.includes('-')) {
+                    const [year, month] = m.split('-');
+                    const dateObj = new Date(year, month - 1);
+                    monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                }
+                const optionHTML = `<option value="${m}">${monthName}</option>`;
+                
+                transMonthFilter.innerHTML += optionHTML;
+                if (m !== 'Invalid Date') {
+                    if (reportFilter) reportFilter.innerHTML += optionHTML;
+                    if (dailyFilter) dailyFilter.innerHTML += optionHTML;
+                }
+            });
+
+            years.forEach(y => {
+                if (y !== 'Invalid Date' && yearFilter) {
+                    yearFilter.innerHTML += `<option value="${y}">${y}</option>`;
+                }
+            });
+
+            if (months.includes(currentTransMonth)) transMonthFilter.value = currentTransMonth;
+            if (reportFilter && months.includes(currentReportSelection)) reportFilter.value = currentReportSelection;
+            if (dailyFilter && months.includes(currentDailySelection)) dailyFilter.value = currentDailySelection;
+            if (yearFilter && years.includes(currentYearSelection)) yearFilter.value = currentYearSelection;
+
+            const custFilterDatalist = document.getElementById('customer-filter-options');
+            if (custFilterDatalist) {
+                const uniqueCustomers = [...new Set(transactions.map(t => t.customer))];
+                uniqueCustomers.sort((a, b) => a.localeCompare(b));
+                custFilterDatalist.innerHTML = uniqueCustomers.map(c => `<option value="${c}">`).join('');
+            }
+        }
+
+        function updatePriceDisplay() {
+            const inputVal = document.getElementById('trans-product-input').value;
+            const priceInput = document.getElementById('trans-price');
+            
+            const item = inventory.find(i => i.name === inputVal);
+            
+            if (item) {
+                if (item.unit === '/quote' || item.price === 0) {
+                    priceInput.readOnly = false;
+                    priceInput.disabled = false;
+                    priceInput.value = ''; 
+                    priceInput.placeholder = "Enter final price";
+                    priceInput.focus();
+                } else {
+                    priceInput.readOnly = true;
+                    priceInput.disabled = true;
+                    priceInput.value = item.price.toFixed(2);
+                }
+                calculateTotal(); 
+            } else {
+                priceInput.value = '';
+                document.getElementById('trans-total').value = '';
+                priceInput.readOnly = true;
+                priceInput.disabled = true;
+            }
+        }
+
+        function calculateTotal() {
+            const price = parseFloat(document.getElementById('trans-price').value);
+            const qty = parseFloat(document.getElementById('trans-qty').value);
+            
+            const discountToggle = document.getElementById('trans-discount-toggle').checked;
+            const discountType = document.getElementById('trans-discount-type').value;
+            const discountVal = parseFloat(document.getElementById('trans-discount-val').value) || 0;
+            
+            const addendumToggle = document.getElementById('trans-addendum-toggle').checked;
+            const addendumVal = parseFloat(document.getElementById('trans-addendum-val').value) || 0;
+            
+            if (!isNaN(price) && !isNaN(qty)) {
+                let subtotal = price * qty;
+                
+                if (discountToggle && discountVal > 0) {
+                    if (discountType === 'percent') {
+                        subtotal -= subtotal * (discountVal / 100);
+                    } else if (discountType === 'flat') {
+                        subtotal -= discountVal;
+                    }
+                }
+                
+                if (addendumToggle && addendumVal > 0) {
+                    subtotal += addendumVal;
+                }
+                
+                document.getElementById('trans-total').value = Math.max(0, subtotal).toFixed(2);
+            }
+        }
+
+        async function addTransaction() {
+            const date = document.getElementById('trans-date').value;
+            const customerName = document.getElementById('trans-customer-input').value.trim();
+            const productName = document.getElementById('trans-product-input').value.trim();
+            const price = parseFloat(document.getElementById('trans-price').value);
+            const qty = parseFloat(document.getElementById('trans-qty').value);
+            const payment = document.getElementById('trans-payment').value;
+            const notes = document.getElementById('trans-notes').value;
+
+            const isVienna = document.getElementById('trans-vienna-toggle').checked;
+            const locationValue = isVienna ? "Vienna" : "Burke";
+
+            const hasDiscount = document.getElementById('trans-discount-toggle').checked;
+            const discountType = document.getElementById('trans-discount-type').value;
+            const discountVal = parseFloat(document.getElementById('trans-discount-val').value) || 0;
+
+            const hasAddendum = document.getElementById('trans-addendum-toggle').checked;
+            const addendumType = document.getElementById('trans-addendum-type').value;
+            const addendumVal = parseFloat(document.getElementById('trans-addendum-val').value) || 0;
+
+            if (!date || !customerName || !productName || !payment || isNaN(qty) || isNaN(price)) {
+                alert("Please fill out all required fields. Ensure Price and Quantity are valid numbers.");
+                return;
+            }
+            
+            const validCustomer = internalData.customers.some(c => c.name.toLowerCase() === customerName.toLowerCase());
+            if (!validCustomer) {
+                alert("Please select a valid customer from the dropdown list.");
+                return;
+            }
+
+            const item = inventory.find(i => i.name.toLowerCase() === productName.toLowerCase());
+            if (!item) {
+                alert("Please select a valid product from the dropdown list.");
+                return;
+            }
+
+            let total = price * qty;
+            let discountDisplay = "None";
+            let addendumDisplay = "None";
+
+            if (hasDiscount && discountVal > 0) {
+                if (discountType === 'percent') {
+                    total -= total * (discountVal / 100);
+                    discountDisplay = `${discountVal}%`;
+                } else if (discountType === 'flat') {
+                    total -= discountVal;
+                    discountDisplay = `$${discountVal.toFixed(2)}`;
+                }
+            }
+            
+            if (hasAddendum && addendumVal > 0 && addendumType) {
+                total += addendumVal;
+                addendumDisplay = `${addendumType}: $${addendumVal.toFixed(2)}`;
+            }
+
+            const payload = {
+                date,
+                location: locationValue,
+                customer: customerName,
+                productName: item ? item.name : productName,
+                price,
+                qty,
+                discount: discountDisplay,
+                addendum: addendumDisplay,
+                total: Math.max(0, total),
+                payment,
+                notes,
+            };
+
+            const wasEditing = !!editingTransactionId;
+            if (wasEditing) {
+                payload.id = editingTransactionId;
+                const orig = transactions.find(t => t.id === editingTransactionId);
+                payload.isRefund = orig ? orig.isRefund : false;
+            } else {
+                payload.isRefund = false;
+            }
+
+            const btn = document.getElementById('btn-add-transaction');
+            const savingText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            try {
+                const saved = await apiFetch('/transactions', { method: 'POST', body: JSON.stringify(payload) });
+
+                if (wasEditing) {
+                    const index = transactions.findIndex(t => t.id === editingTransactionId);
+                    if (index >= 0) transactions[index] = saved; else transactions.push(saved);
+                    editingTransactionId = null;
+                } else {
+                    transactions.push(saved);
+                }
+
+                // Reset inputs
+                document.getElementById('trans-customer-input').value = '';
+                document.getElementById('trans-product-input').value = '';
+                document.getElementById('trans-price').value = '';
+                document.getElementById('trans-qty').value = '';
+                document.getElementById('trans-total').value = '';
+                document.getElementById('trans-payment').value = '';
+                document.getElementById('trans-notes').value = '';
+
+                document.getElementById('trans-vienna-toggle').checked = false;
+
+                document.getElementById('trans-discount-toggle').checked = false;
+                document.getElementById('trans-discount-val').value = '';
+                toggleDiscountFields();
+
+                document.getElementById('trans-addendum-toggle').checked = false;
+                document.getElementById('trans-addendum-val').value = '';
+                toggleAddendumFields();
+
+                document.getElementById('trans-price').readOnly = true;
+                document.getElementById('trans-price').disabled = true;
+
+                document.getElementById('transaction-header').innerText = "Log a Sale";
+                btn.innerText = "Log Transaction";
+                btn.style.backgroundColor = "#b76e79";
+                btn.style.color = "white";
+
+                document.getElementById('trans-date').valueAsDate = new Date();
+
+                updateCustomerNotesDisplay();
+                sortTransactions();
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+            } catch (e) {
+                alert("Could not save this transaction: " + e.message);
+                btn.innerText = savingText;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function editTransaction(id) {
+            const t = transactions.find(item => item.id === id);
+            if (!t) return;
+
+            editingTransactionId = id;
+
+            document.getElementById('trans-date').value = t.date;
+            document.getElementById('trans-vienna-toggle').checked = (t.location === 'Vienna');
+            document.getElementById('trans-customer-input').value = t.customer;
+            updateCustomerNotesDisplay();
+
+            document.getElementById('trans-product-input').value = t.productName;
+            
+            const priceInput = document.getElementById('trans-price');
+            priceInput.value = Math.abs(t.price).toFixed(2);
+            priceInput.readOnly = false;
+            priceInput.disabled = false;
+
+            document.getElementById('trans-qty').value = Math.abs(t.qty);
+
+            if (t.discount && t.discount !== "None" && t.discount !== "N/A") {
+                document.getElementById('trans-discount-toggle').checked = true;
+                toggleDiscountFields();
+                if (t.discount.includes('%')) {
+                    document.getElementById('trans-discount-type').value = 'percent';
+                    document.getElementById('trans-discount-val').value = parseFloat(t.discount);
+                } else {
+                    document.getElementById('trans-discount-type').value = 'flat';
+                    document.getElementById('trans-discount-val').value = parseFloat(t.discount.replace('$', ''));
+                }
+            } else {
+                document.getElementById('trans-discount-toggle').checked = false;
+                toggleDiscountFields();
+            }
+            
+            if (t.addendum && t.addendum !== "None" && t.addendum !== "N/A") {
+                document.getElementById('trans-addendum-toggle').checked = true;
+                toggleAddendumFields();
+                const split = t.addendum.split(': $');
+                if (split.length === 2) {
+                    document.getElementById('trans-addendum-type').value = split[0];
+                    document.getElementById('trans-addendum-val').value = parseFloat(split[1]);
+                }
+            } else {
+                document.getElementById('trans-addendum-toggle').checked = false;
+                toggleAddendumFields();
+            }
+
+            calculateTotal();
+            document.getElementById('trans-payment').value = t.payment;
+            document.getElementById('trans-notes').value = t.notes || "";
+
+            document.getElementById('transaction-header').innerText = `Editing Transaction (${t.id})`;
+            const btn = document.getElementById('btn-add-transaction');
+            btn.innerText = "Save Changes";
+            btn.style.backgroundColor = "#f0ad4e";
+            btn.style.color = "black";
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function copyTransaction(id) {
+            editingTransactionId = null; 
+            const index = transactions.findIndex(t => t.id === id);
+            const t = transactions[index];
+            
+            document.getElementById('trans-date').valueAsDate = new Date();
+            document.getElementById('trans-vienna-toggle').checked = (t.location === 'Vienna');
+            document.getElementById('trans-customer-input').value = t.customer;
+            updateCustomerNotesDisplay();
+
+            const item = inventory.find(i => i.name === t.productName);
+            if (item) {
+                document.getElementById('trans-product-input').value = t.productName;
+                updatePriceDisplay();
+                document.getElementById('trans-price').value = Math.abs(t.price).toFixed(2);
+            } else {
+                alert("The original product has been deleted from the Pricing Sheet. Please select a new product.");
+                document.getElementById('trans-product-input').value = "";
+                document.getElementById('trans-price').value = "";
+            }
+            
+            document.getElementById('trans-qty').value = Math.abs(t.qty);
+            
+            if (t.discount && t.discount !== "None") {
+                document.getElementById('trans-discount-toggle').checked = true;
+                toggleDiscountFields();
+                if (t.discount.includes('%')) {
+                    document.getElementById('trans-discount-type').value = 'percent';
+                    document.getElementById('trans-discount-val').value = parseFloat(t.discount);
+                } else {
+                    document.getElementById('trans-discount-type').value = 'flat';
+                    document.getElementById('trans-discount-val').value = parseFloat(t.discount.replace('$', ''));
+                }
+            } else {
+                document.getElementById('trans-discount-toggle').checked = false;
+                toggleDiscountFields();
+            }
+
+            if (t.addendum && t.addendum !== "None") {
+                document.getElementById('trans-addendum-toggle').checked = true;
+                toggleAddendumFields();
+                const split = t.addendum.split(': $');
+                if (split.length === 2) {
+                    document.getElementById('trans-addendum-type').value = split[0];
+                    document.getElementById('trans-addendum-val').value = parseFloat(split[1]);
+                }
+            } else {
+                document.getElementById('trans-addendum-toggle').checked = false;
+                toggleAddendumFields();
+            }
+
+            calculateTotal();
+            document.getElementById('trans-payment').value = t.payment;
+            
+            let cleanNotes = t.notes || "";
+            cleanNotes = cleanNotes.replace(/Refunded:.*?(\||$)/g, '').trim();
+            if (cleanNotes.endsWith('|')) cleanNotes = cleanNotes.slice(0, -1).trim();
+            document.getElementById('trans-notes').value = cleanNotes;
+            
+            document.getElementById('transaction-header').innerText = "Confirm Copied Transaction";
+            const btn = document.getElementById('btn-add-transaction');
+            btn.innerText = "Log Copied Transaction";
+            btn.style.backgroundColor = "#f0ad4e";
+            btn.style.color = "black";
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function deleteTransaction(id) {
+            if (!confirm("Are you sure you want to completely delete this line?")) return;
+            try {
+                await apiFetch('/transactions', { method: 'DELETE', body: JSON.stringify({ id }) });
+                const index = transactions.findIndex(t => t.id === id);
+                if (index >= 0) transactions.splice(index, 1);
+                selectedTransactionIds.delete(id);
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+            } catch (e) {
+                alert("Could not delete this transaction: " + e.message);
+            }
+        }
+
+        async function refundTransaction(id) {
+            const index = transactions.findIndex(t => t.id === id);
+            const original = transactions[index];
+            if(original.isRefund) {
+                alert("You cannot refund a refund!");
+                return;
+            }
+
+            const origTotal = Math.abs(original.total);
+            const refundInput = prompt(`Enter the refund amount (Max: $${origTotal.toFixed(2)}):`, origTotal.toFixed(2));
+            
+            if (refundInput === null) return; 
+            
+            const refundAmount = parseFloat(refundInput);
+            if (isNaN(refundAmount) || refundAmount <= 0) {
+                alert("Invalid refund amount entered.");
+                return;
+            }
+            if (refundAmount > origTotal) {
+                alert("Refund amount cannot exceed the original total transaction amount.");
+                return;
+            }
+
+            const reason = prompt("How was this refunded? (This will be added to the notes)");
+            if (reason === null) return; 
+
+            const ratio = refundAmount / origTotal;
+            const adjustedQty = Math.abs(original.qty) * ratio;
+
+            const refundRow = { ...original };
+            delete refundRow.id; // let the backend generate a fresh TxnID for this new row
+            refundRow.location = original.location || 'Burke';
+            refundRow.qty = -parseFloat(adjustedQty.toFixed(4));
+            refundRow.total = -parseFloat(refundAmount.toFixed(2));
+            refundRow.discount = "N/A";
+            refundRow.addendum = "N/A";
+            refundRow.isRefund = true;
+
+            let noteText = `Refunded $${refundAmount.toFixed(2)}`;
+            if (reason.trim() !== "") {
+                noteText += `: ${reason}`;
+            }
+            refundRow.notes = (refundRow.notes ? refundRow.notes + " | " : "") + noteText;
+
+            try {
+                const saved = await apiFetch('/transactions', { method: 'POST', body: JSON.stringify(refundRow) });
+                transactions.push(saved);
+                sortTransactions();
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+            } catch (e) {
+                alert("Could not save this refund: " + e.message);
+            }
+        }
+
+        // --- BULK SELECTION & MASS EDIT FUNCTIONS ---
+        function toggleTransactionSelection(id, checkbox) {
+            if (checkbox.checked) {
+                selectedTransactionIds.add(id);
+            } else {
+                selectedTransactionIds.delete(id);
+            }
+            updateBulkActionBar();
+        }
+
+        function toggleSelectAllTransactions(masterCheckbox) {
+            const visibleCheckboxes = document.querySelectorAll('.trans-row-checkbox');
+            visibleCheckboxes.forEach(cb => {
+                cb.checked = masterCheckbox.checked;
+                if (masterCheckbox.checked) {
+                    selectedTransactionIds.add(cb.value);
+                } else {
+                    selectedTransactionIds.delete(cb.value);
+                }
+            });
+            updateBulkActionBar();
+        }
+
+        function updateBulkActionBar() {
+            const bar = document.getElementById('bulk-action-bar');
+            const countSpan = document.getElementById('selected-count');
+            const count = selectedTransactionIds.size;
+            
+            countSpan.innerText = count;
+            bar.style.display = count > 0 ? 'flex' : 'none';
+
+            const masterCheckbox = document.getElementById('select-all-trans');
+            const visibleCheckboxes = document.querySelectorAll('.trans-row-checkbox');
+            if (visibleCheckboxes.length > 0) {
+                masterCheckbox.checked = Array.from(visibleCheckboxes).every(cb => cb.checked);
+            } else {
+                masterCheckbox.checked = false;
+            }
+        }
+
+        async function bulkDeleteTransactions() {
+            const count = selectedTransactionIds.size;
+            if (count === 0) return;
+            if (!confirm(`Are you sure you want to permanently delete all ${count} selected transaction(s)?`)) return;
+
+            const ids = [...selectedTransactionIds];
+            try {
+                await apiFetch('/transactions', { method: 'DELETE', body: JSON.stringify({ ids }) });
+                transactions = transactions.filter(t => !selectedTransactionIds.has(t.id));
+                selectedTransactionIds.clear();
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+            } catch (e) {
+                alert("Could not delete the selected transactions: " + e.message);
+            }
+        }
+
+        function renderTransactionTable() {
+            const tbody = document.querySelector('#transaction-table tbody');
+            const selectedMonth = document.getElementById('month-filter').value;
+            const customerSearchTerm = document.getElementById('customer-filter-input').value.trim().toLowerCase();
+            
+            const rowsHTML = transactions.filter(t => {
+                const transMonth = t.date ? t.date.substring(0, 7) : 'Invalid Date';
+                if (selectedMonth !== "ALL" && transMonth !== selectedMonth) return false; 
+                if (customerSearchTerm !== "" && !t.customer.toLowerCase().includes(customerSearchTerm)) return false;
+                return true;
+            }).map(t => {
+                const rowClass = t.isRefund ? 'refund-row' : '';
+                const isChecked = selectedTransactionIds.has(t.id) ? 'checked' : '';
+                const locStr = t.location || 'Burke';
+                const locBadge = `<span style="background-color: ${locStr === 'Vienna' ? '#dcb5b2' : '#f4e6e5'}; padding: 3px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #d4b8b5;">${locStr}</span>`;
+                
+                return `<tr class="${rowClass}">
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="trans-row-checkbox" value="${t.id}" ${isChecked} onchange="toggleTransactionSelection('${t.id}', this)">
+                    </td>
+                    <td><strong>${t.id}</strong></td>
+                    <td>${t.date || 'Invalid Date'}</td>
+                    <td>${locBadge}</td>
+                    <td>${t.customer}</td>
+                    <td>${t.productName}</td>
+                    <td>$${t.price.toFixed(2)}</td>
+                    <td>${t.qty}</td>
+                    <td>${t.discount || 'None'}</td>
+                    <td>${t.addendum || 'None'}</td>
+                    <td>$${t.total.toFixed(2)}</td>
+                    <td>${t.payment}</td>
+                    <td>${t.notes}</td>
+                    <td>
+                        <button class="btn-edit" onclick="editTransaction('${t.id}')" title="Edit">Edit</button>
+                        <button class="btn-copy" onclick="copyTransaction('${t.id}')" title="Copy">Copy</button>
+                        ${!t.isRefund ? `<button class="btn-refund" onclick="refundTransaction('${t.id}')" title="Refund">Refund</button>` : ''}
+                        <button class="btn-delete" onclick="deleteTransaction('${t.id}')" title="Delete">X</button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            tbody.innerHTML = rowsHTML;
+            updateBulkActionBar();
+        }
+
+        // --- IMPORT LOGIC ---
+        function importTransactionsFromCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim().length > 0);
+
+                const parsedRecords = [];
+
+                for (let i = 1; i < rows.length; i++) {
+                    const rowText = rows[i];
+                    let inQuotes = false;
+                    let currentVal = '';
+                    let parsedCols = [];
+                    
+                    for (let j = 0; j < rowText.length; j++) {
+                        const char = rowText[j];
+                        if (char === '"' && rowText[j+1] === '"' && inQuotes) {
+                            currentVal += '"';
+                            j++; 
+                        } else if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === ',' && !inQuotes) {
+                            parsedCols.push(currentVal);
+                            currentVal = '';
+                        } else {
+                            currentVal += char;
+                        }
+                    }
+                    parsedCols.push(currentVal);
+
+                    if (parsedCols.length >= 8) {
+                        const id = parsedCols[0].replace(/^"|"$/g, '').trim() || generateId();
+                        let rawDate = parsedCols[1].replace(/^"|"$/g, '').trim();
+
+                        if (rawDate.includes('/')) {
+                            const [m, d, y] = rawDate.split('/');
+                            if (m && d && y) {
+                                rawDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                            }
+                        }
+
+                        let offset = 0;
+                        let location = "Burke";
+                        let potentialLocation = parsedCols[2] ? parsedCols[2].replace(/^"|"$/g, '').trim() : "";
+                        
+                        if (potentialLocation === 'Vienna' || potentialLocation === 'Burke') {
+                            location = potentialLocation;
+                            offset = 1; 
+                        }
+
+                        const customer = parsedCols[2 + offset] ? parsedCols[2 + offset].replace(/^"|"$/g, '').trim() : '';
+                        const productName = parsedCols[3 + offset] ? parsedCols[3 + offset].replace(/^"|"$/g, '').trim() : '';
+                        
+                        const rawPrice = parsedCols[4 + offset] ? parsedCols[4 + offset].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim() : '0';
+                        const price = parseFloat(rawPrice) || 0;
+                        
+                        const qty = parsedCols[5 + offset] ? (parseFloat(parsedCols[5 + offset].replace(/^"|"$/g, '').trim()) || 0) : 0;
+                        
+                        let discount = "None";
+                        let addendum = "None";
+                        let rawTotal = "";
+                        let payment = "";
+                        let notes = "";
+
+                        let remainingLen = parsedCols.length - offset;
+                        
+                        if (remainingLen >= 11) {
+                            discount = parsedCols[6 + offset].replace(/^"|"$/g, '').trim() || "None";
+                            addendum = parsedCols[7 + offset].replace(/^"|"$/g, '').trim() || "None";
+                            rawTotal = parsedCols[8 + offset].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim();
+                            payment = parsedCols[9 + offset].replace(/^"|"$/g, '').trim();
+                            notes = parsedCols[10 + offset] ? parsedCols[10 + offset].replace(/^"|"$/g, '').trim() : '';
+                        } else if (remainingLen >= 10) {
+                            discount = parsedCols[6 + offset].replace(/^"|"$/g, '').trim() || "None";
+                            rawTotal = parsedCols[7 + offset].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim();
+                            payment = parsedCols[8 + offset].replace(/^"|"$/g, '').trim();
+                            notes = parsedCols[9 + offset] ? parsedCols[9 + offset].replace(/^"|"$/g, '').trim() : '';
+                        } else {
+                            rawTotal = parsedCols[6 + offset].replace(/^"|"$/g, '').replace(/[\$,]/g, '').trim();
+                            payment = parsedCols[7 + offset].replace(/^"|"$/g, '').trim();
+                            notes = parsedCols[8 + offset] ? parsedCols[8 + offset].replace(/^"|"$/g, '').trim() : '';
+                        }
+
+                        const total = parseFloat(rawTotal) || (price * qty);
+                        const isRefund = (qty < 0 || total < 0);
+
+                        const newTrans = {
+                            id,
+                            date: rawDate,
+                            location,
+                            customer,
+                            productName,
+                            price,
+                            qty,
+                            discount,
+                            addendum,
+                            total,
+                            payment,
+                            notes,
+                            isRefund
+                        };
+
+                        parsedRecords.push(newTrans);
+                    }
+                }
+
+                let importedCount = 0;
+                let updatedCount = 0;
+                let failedCount = 0;
+
+                // Sequential, not Promise.all: each upsert needs to know
+                // whether that TxnID already existed, and rows are processed
+                // in CSV order so a later duplicate row correctly updates an
+                // earlier one from the same file.
+                for (const rec of parsedRecords) {
+                    const existedAlready = transactions.some(t => t.id === rec.id);
+                    try {
+                        const saved = await apiFetch('/transactions', { method: 'POST', body: JSON.stringify(rec) });
+                        const idx = transactions.findIndex(t => t.id === saved.id);
+                        if (idx >= 0) transactions[idx] = saved; else transactions.push(saved);
+                        if (existedAlready) updatedCount++; else importedCount++;
+                    } catch (err) {
+                        failedCount++;
+                    }
+                }
+
+                sortTransactions();
+                updateFilters();
+                renderTransactionTable();
+                generateMonthlyReport();
+
+                alert(`Successfully processed. Imported: ${importedCount} | Updated: ${updatedCount}${failedCount ? ` | Failed: ${failedCount}` : ''}`);
+                document.getElementById('import-csv-input').value = "";
+            };
+
+            reader.readAsText(file);
+        }
+
+        // --- REPORT LOGIC & OVERVIEWS ---
+        function updateRunningTotals() {
+            const now = new Date();
+            const todayStr = now.toISOString().substring(0, 10);
+            const monthStr = todayStr.substring(0, 7);
+            const yearStr = todayStr.substring(0, 4);
+
+            const monthVal = now.getMonth() + 1;
+            const currentQuarter = Math.ceil(monthVal / 3);
+
+            let todayTotal = 0;
+            let monthTotal = 0;
+            let quarterTotal = 0;
+            let yearTotal = 0;
+
+            let activeMonthSet = new Set();
+            let activeQuarterSet = new Set();
+            let activeYearSet = new Set();
+
+            transactions.forEach(t => {
+                if (!t.date) return;
+                const tYear = t.date.substring(0, 4);
+                const tMonth = t.date.substring(0, 7);
+                const tMonthNum = parseInt(t.date.substring(5, 7), 10);
+                const tQuarter = Math.ceil(tMonthNum / 3);
+
+                if (t.date === todayStr) todayTotal += t.total;
+                if (tMonth === monthStr) {
+                    monthTotal += t.total;
+                    activeMonthSet.add(t.customer);
+                }
+                if (tYear === yearStr && tQuarter === currentQuarter) {
+                    quarterTotal += t.total;
+                    activeQuarterSet.add(t.customer);
+                }
+                if (tYear === yearStr) {
+                    yearTotal += t.total;
+                    activeYearSet.add(t.customer);
+                }
+            });
+
+            document.getElementById('total-today').innerText = `$${todayTotal.toFixed(2)}`;
+            document.getElementById('total-month').innerText = `$${monthTotal.toFixed(2)}`;
+            document.getElementById('total-quarter').innerText = `$${quarterTotal.toFixed(2)}`;
+            document.getElementById('total-year').innerText = `$${yearTotal.toFixed(2)}`;
+
+            document.getElementById('current-quarter-label').innerText = currentQuarter;
+            document.getElementById('proj-quarter-label').innerText = currentQuarter;
+
+            document.getElementById('active-month').innerText = activeMonthSet.size;
+            document.getElementById('active-quarter').innerText = activeQuarterSet.size;
+            document.getElementById('active-year').innerText = activeYearSet.size;
+
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const currentDay = now.getDate();
+            const dailyAvgMonth = currentDay > 0 ? (monthTotal / currentDay) : 0;
+            const projMonth = dailyAvgMonth * daysInMonth;
+
+            document.getElementById('proj-month').innerText = `$${projMonth.toFixed(2)}`;
+
+            const quarterStartMonth = (currentQuarter - 1) * 3; 
+            const quarterStartDate = new Date(now.getFullYear(), quarterStartMonth, 1);
+            const quarterEndDate = new Date(now.getFullYear(), quarterStartMonth + 3, 0);
+
+            const totalDaysInQuarter = Math.round((quarterEndDate - quarterStartDate) / (1000 * 60 * 60 * 24)) + 1;
+            const elapsedDaysInQuarter = Math.round((now - quarterStartDate) / (1000 * 60 * 60 * 24)) + 1;
+
+            const dailyAvgQuarter = elapsedDaysInQuarter > 0 ? (quarterTotal / elapsedDaysInQuarter) : 0;
+            const projQuarter = dailyAvgQuarter * totalDaysInQuarter;
+
+            document.getElementById('proj-quarter').innerText = `$${projQuarter.toFixed(2)}`;
+        }
+
+        function renderDailyTotalsOverview() {
+            const container = document.getElementById('daily-calendar-container');
+            const selectedMonth = document.getElementById('daily-overview-month-filter');
+            
+            if (!selectedMonth) return;
+            const monthValue = selectedMonth.value;
+
+            container.innerHTML = '';
+
+            if (!monthValue || monthValue === 'Invalid Date') return;
+
+            const [year, month] = monthValue.split('-').map(Number);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
+
+            const dailySums = {};
+            transactions.forEach(t => {
+                if (t.date && t.date.substring(0, 7) === monthValue) {
+                    const dayNum = parseInt(t.date.substring(8, 10), 10);
+                    dailySums[dayNum] = (dailySums[dayNum] || 0) + t.total;
+                }
+            });
+
+            let html = '<div class="calendar-grid">';
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            daysOfWeek.forEach(d => {
+                html += `<div class="calendar-header">${d}</div>`;
+            });
+
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                html += `<div class="calendar-day-card empty"></div>`;
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const total = dailySums[day] || 0;
+                const cardClass = total > 0 ? 'calendar-day-card has-sales' : 'calendar-day-card';
+                const amtClass = total > 0 ? 'day-amount' : 'day-amount zero';
+                const displayAmt = total > 0 ? `$${total.toFixed(2)}` : '$0.00';
+
+                html += `
+                    <div class="${cardClass}">
+                        <span class="day-number">${day}</span>
+                        <span class="${amtClass}">${displayAmt}</span>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderYearlyOverview() {
+            const container = document.getElementById('yearly-overview-container');
+            const selectYear = document.getElementById('yearly-overview-year-filter');
+            if (!selectYear || !container) return;
+
+            const selectedYear = selectYear.value;
+            container.innerHTML = '';
+
+            if (!selectedYear || selectedYear === 'Invalid Date') {
+                container.innerHTML = '<p>No data available for yearly view.</p>';
+                return;
+            }
+
+            const monthNames = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+
+            const monthlyTotals = Array(12).fill(0);
+            let yearlyGrandTotal = 0;
+
+            transactions.forEach(t => {
+                if (t.date && t.date.substring(0, 4) === selectedYear) {
+                    const monthIdx = parseInt(t.date.substring(5, 7), 10) - 1;
+                    if (monthIdx >= 0 && monthIdx < 12) {
+                        monthlyTotals[monthIdx] += t.total;
+                        yearlyGrandTotal += t.total;
+                    }
+                }
+            });
+
+            let html = `
+                <div class="report-summary-box" style="margin-top: 15px;">
+                    <strong>Total Revenue Snapshot for ${selectedYear}:</strong><br>
+                    Cumulative Revenue: <strong>$${yearlyGrandTotal.toFixed(2)}</strong>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Total Net Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            monthNames.forEach((mName, index) => {
+                const amt = monthlyTotals[index];
+                html += `
+                    <tr>
+                        <td><strong>${mName}</strong></td>
+                        <td>$${amt.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    <tr style="font-weight: bold; background-color: #f4e6e5;">
+                        <td>${selectedYear} Annual Total:</td>
+                        <td>$${yearlyGrandTotal.toFixed(2)}</td>
+                    </tr>
+                </tbody>
+            </table>`;
+
+            container.innerHTML = html;
+        }
+
+        function generateMonthlyReport() {
+            updateRunningTotals();
+            renderDailyTotalsOverview();
+            renderYearlyOverview();
+
+            const selectedMonth = document.getElementById('report-month-filter');
+            const container = document.getElementById('report-container');
+            
+            if(!selectedMonth || !container) return;
+            const monthValue = selectedMonth.value;
+            container.innerHTML = '';
+
+            if (!monthValue || monthValue === 'Invalid Date') {
+                container.innerHTML = '<p>No data available to report.</p>';
+                return;
+            }
+
+            const monthlyTrans = transactions.filter(t => t.date && t.date.substring(0, 7) === monthValue);
+
+            if (monthlyTrans.length === 0) {
+                container.innerHTML = '<p>No transactions found for this month.</p>';
+                return;
+            }
+
+            let grandTotalRev = 0;
+            let burkeRev = 0;
+            let viennaRev = 0;
+            
+            const stats = {}; 
+            monthlyTrans.forEach(t => {
+                if (t.location === 'Vienna') {
+                    viennaRev += t.total;
+                } else {
+                    burkeRev += t.total;
+                }
+                grandTotalRev += t.total;
+
+                if (!stats[t.productName]) {
+                    const invItem = inventory.find(i => i.name === t.productName);
+                    stats[t.productName] = {
+                        qty: 0,
+                        revenue: 0,
+                        category: invItem ? invItem.category : 'Uncategorized / Deleted'
+                    };
+                }
+                stats[t.productName].qty += t.qty;
+                stats[t.productName].revenue += t.total;
+            });
+
+            const grouped = {};
+            const categoryTotals = {};
+            const productTotals = {};
+
+            for (const [prodName, data] of Object.entries(stats)) {
+                if (!grouped[data.category]) grouped[data.category] = [];
+                grouped[data.category].push({ name: prodName, qty: data.qty, revenue: data.revenue });
+
+                categoryTotals[data.category] = (categoryTotals[data.category] || 0) + data.revenue;
+                productTotals[prodName] = data.revenue;
+            }
+
+            let reportHTML = `
+                <div class="report-summary-box">
+                    <strong>Total Net Revenue: $${grandTotalRev.toFixed(2)}</strong>
+                    <div style="margin-top: 15px; display: flex; gap: 20px; font-size: 16px;">
+                        <div style="flex: 1; background-color: #ffffff; padding: 10px; border-radius: 4px; border: 1px solid #dcb5b2;">
+                            📍 Burke Revenue: <br><strong style="font-size: 1.2rem;">$${burkeRev.toFixed(2)}</strong>
+                        </div>
+                        <div style="flex: 1; background-color: #ffffff; padding: 10px; border-radius: 4px; border: 1px solid #dcb5b2;">
+                            📍 Vienna Revenue: <br><strong style="font-size: 1.2rem;">$${viennaRev.toFixed(2)}</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            for (const [category, items] of Object.entries(grouped)) {
+                reportHTML += `<h3 class="report-category-title">${category} - $${categoryTotals[category].toFixed(2)}</h3>`;
+                reportHTML += `<table><thead><tr><th>Product</th><th>Qty Sold</th><th>Revenue</th></tr></thead><tbody>`;
+                
+                items.sort((a, b) => b.revenue - a.revenue).forEach(item => {
+                    reportHTML += `
+                        <tr>
+                            <td>${item.name}</td>
+                            <td>${item.qty}</td>
+                            <td>$${item.revenue.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                
+                reportHTML += `</tbody></table>`;
+            }
+
+            container.innerHTML = reportHTML;
+        }
+
+        // --- GLOBAL EXPORT LOGIC FOR TABLES ---
+        function exportTableToCSV(tableId, filename) {
+            const table = document.getElementById(tableId);
+            let csvContent = [];
+            const rows = table.querySelectorAll('tr');
+            
+            for (const row of rows) {
+                const cols = row.querySelectorAll('th, td');
+                const rowData = [];
+                
+                for (let i = 0; i < cols.length; i++) {
+                    if (tableId === 'transaction-table' && (i === 0 || i === cols.length - 1)) continue;
+                    if (tableId === 'pricing-table' && i === cols.length - 1) continue;
+                    
+                    let text = cols[i].innerText.replace(/"/g, '""');
+                    rowData.push(`"${text}"`);
+                }
+                csvContent.push(rowData.join(","));
+            }
+            
+            downloadCSV(csvContent.join("\n"), filename);
+        }
+
+        function exportMonthlyReportToCSV() {
+            const selectedMonth = document.getElementById('report-month-filter').value;
+            if (!selectedMonth || selectedMonth === 'Invalid Date') return;
+            
+            const monthlyTrans = transactions.filter(t => t.date && t.date.substring(0, 7) === selectedMonth);
+            
+            let csvContent = ["Date,ID,Location,Customer,Product,Price,Qty,Discount,Addendum,Total,Payment,Notes"];
+            
+            monthlyTrans.forEach(t => {
+                const row = [
+                    t.date, 
+                    t.id, 
+                    (t.location || 'Burke'), 
+                    t.customer, 
+                    t.productName, 
+                    t.price, 
+                    t.qty, 
+                    t.discount, 
+                    t.addendum, 
+                    t.total, 
+                    t.payment, 
+                    t.notes
+                ].map(val => `"${String(val).replace(/"/g, '""')}"`);
+                
+                csvContent.push(row.join(","));
+            });
+            
+            downloadCSV(csvContent.join("\n"), `Monthly_Report_${selectedMonth}.csv`);
+        }
+
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+    </script>
+</body>
+</html>
