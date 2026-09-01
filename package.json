@@ -1,0 +1,10 @@
+{
+  "name": "tj-transaction-journal-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify Functions backend for the Master Transaction Journal, backed by Google Sheets. Reuses The Gajer Practice's existing Google Cloud service account and OAuth client.",
+  "dependencies": {
+    "googleapis": "^140.0.1",
+    "google-auth-library": "^9.14.1"
+  }
+}
