@@ -46,10 +46,25 @@ async function verifyRequest(event) {
   }
   const idToken = header.slice(7);
 
-  const ticket = await getClient().verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_OAUTH_CLIENT_ID,
-  });
+  let ticket;
+  try {
+    ticket = await getClient().verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_OAUTH_CLIENT_ID,
+    });
+  } catch (err) {
+    // verifyIdToken() throws its own plain Error for anything wrong with the
+    // token itself — expired ("Token used too late"), malformed, wrong
+    // audience, bad signature, etc. Left as a plain Error it comes back as a
+    // 500, so the frontend's apiFetch() never sees the 401 it watches for —
+    // instead of a clean "please sign in again" prompt, the user sees a raw
+    // error alert (which, worse, echoes the decoded token payload back at
+    // them, as happened when a stale token from an earlier sign-in was
+    // reused after it expired). Normalizing it to AuthError makes it a 401,
+    // so the frontend's existing signOut()-on-401 handling takes over and
+    // sends them back to a plain sign-in screen instead.
+    throw new AuthError("Your sign-in has expired. Please sign in again.");
+  }
   const payload = ticket.getPayload();
   const email = payload.email;
   const domain = payload.hd || (email || "").split("@")[1];
