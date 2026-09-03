@@ -566,9 +566,10 @@
                 <select id="trans-discount-type" class="discount-field" style="display: none;" onchange="updateDiscountPlaceholder(); calculateTotal();">
                     <option value="percent">% Percentage</option>
                     <option value="flat">$ Flat / Gift Cards</option>
+                    <option value="membership">Covered by Membership</option>
                 </select>
 
-                <label class="discount-field" style="display: none;">Discount Value:</label>
+                <label id="trans-discount-val-label" class="discount-field" style="display: none;">Discount Value:</label>
                 <input type="number" id="trans-discount-val" class="discount-field" style="display: none;" step="0.01" placeholder="e.g. 10" oninput="calculateTotal()">
 
                 <!-- ADDENDUM CONTROLS -->
@@ -1596,6 +1597,22 @@
         function updateDiscountPlaceholder() {
             const type = document.getElementById('trans-discount-type').value;
             const input = document.getElementById('trans-discount-val');
+            const label = document.getElementById('trans-discount-val-label');
+            const discountOn = document.getElementById('trans-discount-toggle').checked;
+
+            if (type === 'membership') {
+                // Automatic 100% discount — no manual value needed, so hide the field.
+                input.value = '';
+                input.style.display = 'none';
+                if (label) label.style.display = 'none';
+                return;
+            }
+
+            if (discountOn) {
+                input.style.display = 'block';
+                if (label) label.style.display = 'block';
+            }
+
             if (type === 'percent') {
                 input.placeholder = "e.g. 10 (for 10%)";
             } else {
@@ -1742,14 +1759,18 @@
             if (!isNaN(price) && !isNaN(qty)) {
                 let subtotal = price * qty;
                 
-                if (discountToggle && discountVal > 0) {
-                    if (discountType === 'percent') {
-                        subtotal -= subtotal * (discountVal / 100);
-                    } else if (discountType === 'flat') {
-                        subtotal -= discountVal;
+                if (discountToggle) {
+                    if (discountType === 'membership') {
+                        subtotal = 0;
+                    } else if (discountVal > 0) {
+                        if (discountType === 'percent') {
+                            subtotal -= subtotal * (discountVal / 100);
+                        } else if (discountType === 'flat') {
+                            subtotal -= discountVal;
+                        }
                     }
                 }
-                
+
                 if (addendumToggle && addendumVal > 0) {
                     subtotal += addendumVal;
                 }
@@ -1799,13 +1820,18 @@
             let discountDisplay = "None";
             let addendumDisplay = "None";
 
-            if (hasDiscount && discountVal > 0) {
-                if (discountType === 'percent') {
-                    total -= total * (discountVal / 100);
-                    discountDisplay = `${discountVal}%`;
-                } else if (discountType === 'flat') {
-                    total -= discountVal;
-                    discountDisplay = `$${discountVal.toFixed(2)}`;
+            if (hasDiscount) {
+                if (discountType === 'membership') {
+                    total = 0;
+                    discountDisplay = "Covered by Membership";
+                } else if (discountVal > 0) {
+                    if (discountType === 'percent') {
+                        total -= total * (discountVal / 100);
+                        discountDisplay = `${discountVal}%`;
+                    } else if (discountType === 'flat') {
+                        total -= discountVal;
+                        discountDisplay = `$${discountVal.toFixed(2)}`;
+                    }
                 }
             }
             
@@ -1918,7 +1944,11 @@
             if (t.discount && t.discount !== "None" && t.discount !== "N/A") {
                 document.getElementById('trans-discount-toggle').checked = true;
                 toggleDiscountFields();
-                if (t.discount.includes('%')) {
+                if (t.discount === 'Covered by Membership') {
+                    document.getElementById('trans-discount-type').value = 'membership';
+                    document.getElementById('trans-discount-val').value = '';
+                    updateDiscountPlaceholder();
+                } else if (t.discount.includes('%')) {
                     document.getElementById('trans-discount-type').value = 'percent';
                     document.getElementById('trans-discount-val').value = parseFloat(t.discount);
                 } else {
@@ -1982,7 +2012,11 @@
             if (t.discount && t.discount !== "None") {
                 document.getElementById('trans-discount-toggle').checked = true;
                 toggleDiscountFields();
-                if (t.discount.includes('%')) {
+                if (t.discount === 'Covered by Membership') {
+                    document.getElementById('trans-discount-type').value = 'membership';
+                    document.getElementById('trans-discount-val').value = '';
+                    updateDiscountPlaceholder();
+                } else if (t.discount.includes('%')) {
                     document.getElementById('trans-discount-type').value = 'percent';
                     document.getElementById('trans-discount-val').value = parseFloat(t.discount);
                 } else {
