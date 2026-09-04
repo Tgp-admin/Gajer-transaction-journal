@@ -1,5 +1,6 @@
 const { readRange, appendRow, updateRange, clearRange, colLetter } = require("./_lib/sheets");
 const { verifyRequest } = require("./_lib/auth");
+const { requireFullAccess } = require("./_lib/roles");
 const { rowsToObjects, toNumber, json, errorResponse, corsHeaders } = require("./_lib/rows");
 
 // Three simple dropdown-management lists share this one function, keyed by
@@ -18,7 +19,8 @@ const TYPES = {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders(), body: "" };
   try {
-    await verifyRequest(event);
+    const staff = await verifyRequest(event);
+    requireFullAccess(staff, event.httpMethod);
 
     const type = (event.queryStringParameters || {}).type;
     const config = TYPES[type];
