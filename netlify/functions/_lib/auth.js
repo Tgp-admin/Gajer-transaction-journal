@@ -1,4 +1,5 @@
 const { OAuth2Client } = require("google-auth-library");
+const { getRole } = require("./roles");
 
 class AuthError extends Error {
   constructor(message) {
@@ -33,11 +34,17 @@ function getClient() {
  * JS would not do this — anyone can view-source a static page, but they
  * can't forge a Google-signed ID token for a domain they don't control.
  *
- * Returns { email, name } for the verified staff member — this is what the
- * backend trusts for "who did this," NOT any name typed in the UI.
+ * Returns { email, name, role } for the verified staff member — this is what
+ * the backend trusts for "who did this" and "what are they allowed to do,"
+ * NOT any name or role hint coming from the page's own JavaScript. `role` is
+ * "full" for everyone except the accounts explicitly listed as "restricted"
+ * on the StaffAccess tab (see _lib/roles.js) — front-desk accounts limited
+ * to logging sales. Each function decides for itself what a "restricted"
+ * caller may do; this just tells them which one the caller is.
  *
- * Reused as-is from the Gajer Practice quoting app's netlify/functions/_lib/auth.js
- * so both apps share one Workspace domain restriction and one OAuth client.
+ * The token-verification core is reused as-is from the Gajer Practice
+ * quoting app's netlify/functions/_lib/auth.js so both apps share one
+ * Workspace domain restriction and one OAuth client.
  */
 async function verifyRequest(event) {
   const header = event.headers.authorization || event.headers.Authorization;
@@ -73,7 +80,9 @@ async function verifyRequest(event) {
   if (!payload.email_verified) throw new AuthError("Email not verified with Google");
   if (domain !== allowedDomain) throw new AuthError(`Account domain "${domain}" is not authorized`);
 
-  return { email, name: payload.name || email };
+  const role = await getRole(email);
+
+  return { email, name: payload.name || email, role };
 }
 
 module.exports = { verifyRequest, AuthError };
