@@ -1,5 +1,6 @@
 const { readRange, appendRow, updateRange, clearRange, colLetter } = require("./_lib/sheets");
 const { verifyRequest } = require("./_lib/auth");
+const { requireFullAccess } = require("./_lib/roles");
 const { rowsToObjects, toNumber, json, errorResponse, corsHeaders } = require("./_lib/rows");
 
 const RANGE = process.env.INVENTORY_RANGE || "Inventory";
@@ -19,7 +20,8 @@ function fieldsFromRow(r) {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders(), body: "" };
   try {
-    await verifyRequest(event);
+    const staff = await verifyRequest(event);
+    requireFullAccess(staff, event.httpMethod);
 
     if (event.httpMethod === "GET") {
       const rows = await readRange(process.env.TJ_DATA_SHEET_ID, RANGE);
