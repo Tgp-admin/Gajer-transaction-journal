@@ -615,10 +615,11 @@
             </div>
         </div>
 
+        <div id="transaction-history-wrapper">
         <hr>
 
         <h2>Transaction History</h2>
-        
+
         <div class="table-controls">
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div>
@@ -672,6 +673,7 @@
             <tbody>
             </tbody>
         </table>
+        </div>
     </div>
 
     <!-- TAB 3: Pricing & Inventory -->
@@ -832,6 +834,13 @@
         let currentUser = null;
         try { currentUser = JSON.parse(localStorage.getItem('tj_auth_profile') || 'null'); } catch(e) { currentUser = null; }
 
+        // "full" (everyone, by default) or "restricted" (front-desk-only —
+        // can log sales but nothing else). This is confirmed fresh from the
+        // server via /api/me on every sign-in (see loadCurrentRole()) — it's
+        // only ever used here to decide what the UI *shows*; every actual
+        // permission is enforced server-side regardless of this value.
+        let currentRole = 'full';
+
         function initGoogleSignIn() {
             if (window.google && window.google.accounts && window.google.accounts.id) {
                 google.accounts.id.initialize({
@@ -878,7 +887,7 @@
             document.getElementById('signin-screen').style.display = 'flex';
         }
 
-        function enterApp() {
+        async function enterApp() {
             document.getElementById('signin-screen').style.display = 'none';
             document.getElementById('app-content').style.display = 'block';
             const label = document.getElementById('signed-in-as');
@@ -886,7 +895,52 @@
                 label.innerHTML = `Signed in as ${currentUser.name} <button onclick="signOut()">Sign out</button>`;
             }
             document.getElementById('trans-date').valueAsDate = new Date();
+            await loadCurrentRole();
+            applyRoleRestrictions();
             loadAllData();
+        }
+
+        // Asks the server which account this is — "full" or "restricted"
+        // (front-desk-only) — so the UI can show the right thing. This is
+        // never guessed client-side; it's always the server's answer.
+        async function loadCurrentRole() {
+            try {
+                const me = await apiFetch('/me');
+                currentRole = me.role === 'restricted' ? 'restricted' : 'full';
+            } catch (e) {
+                // Couldn't reach /api/me — don't lock the whole app over it.
+                // Every real permission is still enforced server-side no
+                // matter what this defaults to.
+                currentRole = 'full';
+            }
+        }
+
+        // Shows/hides parts of the app based on currentRole. A "restricted"
+        // (front-desk-only) account gets everything EXCEPT the Pricing &
+        // Inventory and TJ Internal tabs — per Troy's call, they keep full
+        // use of Transactions (logging sales plus copy/edit/refund/delete)
+        // and Reports/Analytics. This is a UI convenience only: the actual
+        // access control is server-side in every function's own role check
+        // (see _lib/roles.js), exactly like the domain lock itself — nothing
+        // in this file could be used to bypass it.
+        function applyRoleRestrictions() {
+            const isRestricted = currentRole === 'restricted';
+            ['btn-pricing', 'btn-tj-internal'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = isRestricted ? 'none' : '';
+            });
+
+            // Safety net: if an off-limits tab somehow ended up the active
+            // one for a restricted account (e.g. switching accounts without
+            // a full page reload), land on Transactions instead of leaving
+            // Pricing & Inventory or TJ Internal showing with just its nav
+            // button hidden.
+            if (isRestricted) {
+                const activeTab = document.querySelector('.tab-content.active');
+                if (activeTab && (activeTab.id === 'tab-pricing' || activeTab.id === 'tab-tj-internal')) {
+                    switchTab('transactions');
+                }
+            }
         }
 
         // --- API LAYER (replaces localStorage as the source of truth, so
@@ -969,6 +1023,13 @@
 
         // --- TAB SWITCHING ---
         function switchTab(tabName) {
+            // A restricted (front-desk-only) account can't reach Pricing &
+            // Inventory or TJ Internal (see applyRoleRestrictions(), which
+            // hides those nav buttons) — redirect here too in case anything
+            // ever tries to switch there on their behalf regardless.
+            if (currentRole === 'restricted' && (tabName === 'pricing' || tabName === 'tj-internal')) {
+                tabName = 'transactions';
+            }
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('.tab-nav button').forEach(btn => btn.classList.remove('active'));
             
