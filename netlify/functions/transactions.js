@@ -49,6 +49,11 @@ function generateId() {
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: corsHeaders(), body: "" };
   try {
+    // Transactions has no role restriction: a "restricted" (front-desk-only)
+    // account gets full use of this tab — logging sales plus the copy,
+    // edit, refund, and delete tools — per Troy's call. The only tabs a
+    // restricted account can't touch are Pricing & Inventory and TJ
+    // Internal (see inventory.js, customers.js, lists.js).
     const staff = await verifyRequest(event);
 
     if (event.httpMethod === "GET") {
