@@ -407,6 +407,7 @@
         <button id="btn-reports" class="active" onclick="switchTab('reports')">Reporting Overview</button>
         <button id="btn-analytics" onclick="switchTab('analytics')">Reporting & Analytics</button>
         <button id="btn-transactions" onclick="switchTab('transactions')">Transactions</button>
+        <button id="btn-customers" onclick="switchTab('customers')">Customers</button>
         <button id="btn-pricing" onclick="switchTab('pricing')">Pricing & Inventory</button>
         <button id="btn-tj-internal" onclick="switchTab('tj-internal')">TJ Internal</button>
     </div>
@@ -583,7 +584,7 @@
                 </select>
 
                 <label class="addendum-field" style="display: none;">Addendum Value ($):</label>
-                <input type="number" id="trans-addendum-val" class="addendum-field" style="display: none;" step="0.01" placeholder="Auto-fills from type" readonly disabled>
+                <input type="number" id="trans-addendum-val" class="addendum-field" style="display: none;" step="0.01" placeholder="Auto-fills from type" oninput="calculateTotal()" readonly disabled>
 
                 <!-- VIENNA CONTROL -->
                 <label></label>
@@ -603,6 +604,7 @@
                 <input type="text" id="trans-notes">
                 
                 <button type="button" id="btn-add-transaction" class="btn-submit" onclick="addTransaction()">Log Transaction</button>
+                <button type="button" id="btn-cancel-transaction" class="btn-submit" style="display: none; background-color: #999; color: white; margin-top: 8px;" onclick="cancelEditOrCopy()">Cancel</button>
             </div>
 
             <!-- Notes Panel (Right Side) -->
@@ -627,10 +629,16 @@
                         <option value="ALL">All Months</option>
                     </select>
                 </div>
-                
+
                 <div>
-                    <label><strong>Filter by Customer: </strong></label>
-                    <input list="customer-filter-options" id="customer-filter-input" placeholder="Search customer..." oninput="renderTransactionTable()" style="width: 180px;">
+                    <label><strong>Filter by Day: </strong></label>
+                    <input type="date" id="day-filter" onchange="renderTransactionTable()">
+                    <button type="button" onclick="document.getElementById('day-filter').value=''; renderTransactionTable();" style="font-size:12px; padding: 4px 8px;" title="Clear day filter">Clear</button>
+                </div>
+
+                <div>
+                    <label><strong>Search: </strong></label>
+                    <input list="customer-filter-options" id="customer-filter-input" placeholder="Search customer, product, notes..." oninput="renderTransactionTable()" style="width: 220px;">
                     <datalist id="customer-filter-options"></datalist>
                 </div>
             </div>
@@ -672,6 +680,31 @@
             <tbody>
             </tbody>
         </table>
+        </div>
+    </div>
+
+    <!-- TAB: Customers (its own tab so front-desk/restricted accounts can add
+         new patients without needing full TJ Internal access) -->
+    <div id="tab-customers" class="tab-content">
+        <h2>Customers</h2>
+        <p>Add new patients here, or search the existing list. <em>(Note: Editing or deleting a customer won't alter past transactions.)</em></p>
+
+        <div class="internal-section" style="max-width: 500px;">
+            <div style="display:flex; gap:5px; flex-wrap: wrap; margin-bottom: 8px;">
+                <input type="text" id="new-customer" placeholder="Customer Name" style="flex: 1;">
+                <input type="text" id="new-customer-dob" placeholder="MM/DD/YYYY" style="width: 100px;">
+                <textarea id="new-customer-notes" placeholder="Notes (Optional)" style="width: 100%; margin-top: 5px; box-sizing: border-box;" rows="2"></textarea>
+                <button onclick="addCustomer()" style="width: 100%; margin-top: 5px;">Add</button>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom: 8px;">
+                <input type="text" id="search-customer-internal" placeholder="🔍 Search customers..." oninput="renderInternalLists()" style="width: 100%; box-sizing: border-box;">
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom: 10px;">
+                <input type="file" id="import-customers-input" accept=".csv" style="display:none;" onchange="importInternalCSV('customers', event)">
+                <button onclick="document.getElementById('import-customers-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
+                <button onclick="exportInternalCSV('customers')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
+            </div>
+            <ul id="customer-list" class="internal-list"></ul>
         </div>
     </div>
 
@@ -746,25 +779,6 @@
                 <ul id="category-list" class="internal-list"></ul>
             </div>
 
-            <!-- Customers Section -->
-            <div class="internal-section">
-                <h3>Customers</h3>
-                <div style="display:flex; gap:5px; flex-wrap: wrap; margin-bottom: 8px;">
-                    <input type="text" id="new-customer" placeholder="Customer Name" style="flex: 1;">
-                    <input type="text" id="new-customer-dob" placeholder="MM/DD/YYYY" style="width: 100px;">
-                    <textarea id="new-customer-notes" placeholder="Notes (Optional)" style="width: 100%; margin-top: 5px; box-sizing: border-box;" rows="2"></textarea>
-                    <button onclick="addCustomer()" style="width: 100%; margin-top: 5px;">Add</button>
-                </div>
-                <div style="display:flex; gap:5px; margin-bottom: 8px;">
-                    <input type="text" id="search-customer-internal" placeholder="🔍 Search customers..." oninput="renderInternalLists()" style="width: 100%; box-sizing: border-box;">
-                </div>
-                <div style="display:flex; gap:5px; margin-bottom: 10px;">
-                    <input type="file" id="import-customers-input" accept=".csv" style="display:none;" onchange="importInternalCSV('customers', event)">
-                    <button onclick="document.getElementById('import-customers-input').click()" style="font-size:12px; padding: 4px 8px; background-color: #5c4747; color: white; border: none; border-radius:3px; cursor:pointer;">Import CSV</button>
-                    <button onclick="exportInternalCSV('customers')" style="font-size:12px; padding: 4px 8px; background-color: #c98ca3; color: white; border: none; border-radius:3px; cursor:pointer;">Export CSV</button>
-                </div>
-                <ul id="customer-list" class="internal-list"></ul>
-            </div>
 
             <!-- Payment Methods Section -->
             <div class="internal-section">
@@ -828,6 +842,7 @@
         let transactions = [];
         let editingInventoryIndex = -1;
         let editingTransactionId = null;
+        let isCopyPending = false; // true while a copied transaction is staged for confirmation, not yet saved
         let selectedTransactionIds = new Set();
 
         let internalData = {
@@ -837,6 +852,11 @@
             addendums: [],
             discounts: []
         };
+
+        // Fixed sentinel for the free-form "Custom Addendum" option — kept
+        // distinct from any real addendum name on the Addendums tab so it
+        // can never collide with one.
+        const CUSTOM_ADDENDUM_VALUE = '__custom_addendum__';
 
         function generateId() {
             return 'TXN-' + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1339,9 +1359,13 @@
             const limit = 50;
             const visible = filtered.slice(0, limit);
 
+            // Per Troy: every role can add, edit, and delete customer
+            // records — customer names on completed transactions aren't
+            // affected by later edits/deletes, and front desk is who
+            // actually finds and cleans up duplicates day to day.
             let custHTML = visible.map(c => {
                 let display = c.dob !== "N/A" ? `${c.name} <small>(${c.dob})</small>` : c.name;
-                return `<li><span>${display}</span> 
+                return `<li><span>${display}</span>
                     <div>
                         <button class="btn-edit" onclick="editCustomer(${c.originalIndex})">Edit</button>
                         <button class="btn-delete" onclick="deleteInternalItem('customers', ${c.originalIndex})">X</button>
@@ -1526,8 +1550,13 @@
             paySelect.innerHTML = '<option value="">-- Select Payment --</option>' + 
                 internalData.payments.map(p => `<option value="${p}">${p}</option>`).join('');
                 
+            // Addendum dropdown: named presets from the Addendums tab
+            // auto-fill a locked amount, same as always; "Custom Addendum" is
+            // a fixed free-form choice (like Discount's Percent/Flat) that
+            // lets staff type in any dollar amount to add to the total.
             const addSelect = document.getElementById('trans-addendum-type');
             addSelect.innerHTML = '<option value="">-- Select Fee Type --</option>' +
+                `<option value="${CUSTOM_ADDENDUM_VALUE}">Custom Addendum</option>` +
                 internalData.addendums.map(a => `<option value="${a.name}">${a.name} ($${a.amount.toFixed(2)})</option>`).join('');
 
             // Discount dropdown: "Percent" and "Flat" stay as fixed, free-form
@@ -1811,7 +1840,11 @@
             fields.forEach(el => el.style.display = isChecked ? 'block' : 'none');
             
             if (!isChecked) {
-                document.getElementById('trans-addendum-val').value = '';
+                const valInput = document.getElementById('trans-addendum-val');
+                valInput.value = '';
+                valInput.readOnly = true;
+                valInput.disabled = true;
+                valInput.placeholder = 'Auto-fills from type';
                 document.getElementById('trans-addendum-type').value = '';
             }
             calculateTotal();
@@ -1820,7 +1853,21 @@
         function autoFillAddendumAmount() {
             const selectedName = document.getElementById('trans-addendum-type').value;
             const valInput = document.getElementById('trans-addendum-val');
-            
+
+            if (selectedName === CUSTOM_ADDENDUM_VALUE) {
+                // Free-form: staff types in whatever dollar amount applies,
+                // same idea as Discount's Percent/Flat boxes.
+                valInput.value = '';
+                valInput.readOnly = false;
+                valInput.disabled = false;
+                valInput.placeholder = 'e.g. 25.00';
+                return;
+            }
+
+            valInput.readOnly = true;
+            valInput.disabled = true;
+            valInput.placeholder = 'Auto-fills from type';
+
             const match = internalData.addendums.find(a => a.name === selectedName);
             if (match) {
                 valInput.value = match.amount.toFixed(2);
@@ -2032,7 +2079,8 @@
             
             if (hasAddendum && addendumVal > 0 && addendumType) {
                 total += addendumVal;
-                addendumDisplay = `${addendumType}: $${addendumVal.toFixed(2)}`;
+                const addendumLabel = addendumType === CUSTOM_ADDENDUM_VALUE ? 'Custom Addendum' : addendumType;
+                addendumDisplay = `${addendumLabel}: $${addendumVal.toFixed(2)}`;
             }
 
             const payload = {
@@ -2069,41 +2117,12 @@
                 if (wasEditing) {
                     const index = transactions.findIndex(t => t.id === editingTransactionId);
                     if (index >= 0) transactions[index] = saved; else transactions.push(saved);
-                    editingTransactionId = null;
                 } else {
                     transactions.push(saved);
                 }
 
-                // Reset inputs
-                document.getElementById('trans-customer-input').value = '';
-                document.getElementById('trans-product-input').value = '';
-                document.getElementById('trans-price').value = '';
-                document.getElementById('trans-qty').value = '';
-                document.getElementById('trans-total').value = '';
-                document.getElementById('trans-payment').value = '';
-                document.getElementById('trans-notes').value = '';
+                resetTransactionFormToAddMode();
 
-                document.getElementById('trans-vienna-toggle').checked = false;
-
-                document.getElementById('trans-discount-toggle').checked = false;
-                document.getElementById('trans-discount-val').value = '';
-                toggleDiscountFields();
-
-                document.getElementById('trans-addendum-toggle').checked = false;
-                document.getElementById('trans-addendum-val').value = '';
-                toggleAddendumFields();
-
-                document.getElementById('trans-price').readOnly = true;
-                document.getElementById('trans-price').disabled = true;
-
-                document.getElementById('transaction-header').innerText = "Log a Sale";
-                btn.innerText = "Log Transaction";
-                btn.style.backgroundColor = "#b76e79";
-                btn.style.color = "white";
-
-                document.getElementById('trans-date').valueAsDate = new Date();
-
-                updateCustomerNotesDisplay();
                 sortTransactions();
                 updateFilters();
                 renderTransactionTable();
@@ -2114,6 +2133,53 @@
             } finally {
                 btn.disabled = false;
             }
+        }
+
+        // Clears the Log a Sale / Edit / Copy form back to its blank,
+        // "add a new sale" state. Used both after a successful save and
+        // when the user hits Cancel out of an edit or a pending copy.
+        function resetTransactionFormToAddMode() {
+            editingTransactionId = null;
+            isCopyPending = false;
+
+            document.getElementById('trans-customer-input').value = '';
+            document.getElementById('trans-product-input').value = '';
+            document.getElementById('trans-price').value = '';
+            document.getElementById('trans-qty').value = '';
+            document.getElementById('trans-total').value = '';
+            document.getElementById('trans-payment').value = '';
+            document.getElementById('trans-notes').value = '';
+
+            document.getElementById('trans-vienna-toggle').checked = false;
+
+            document.getElementById('trans-discount-toggle').checked = false;
+            document.getElementById('trans-discount-val').value = '';
+            toggleDiscountFields();
+
+            document.getElementById('trans-addendum-toggle').checked = false;
+            document.getElementById('trans-addendum-val').value = '';
+            toggleAddendumFields();
+
+            document.getElementById('trans-price').readOnly = true;
+            document.getElementById('trans-price').disabled = true;
+
+            document.getElementById('transaction-header').innerText = "Log a Sale";
+            const btn = document.getElementById('btn-add-transaction');
+            btn.innerText = "Log Transaction";
+            btn.style.backgroundColor = "#b76e79";
+            btn.style.color = "white";
+            document.getElementById('btn-cancel-transaction').style.display = 'none';
+
+            document.getElementById('trans-date').valueAsDate = new Date();
+
+            updateCustomerNotesDisplay();
+        }
+
+        // "Cancel" on an in-progress Edit or Copy: discard the staged
+        // changes and go back to a blank Log a Sale form without saving.
+        function cancelEditOrCopy() {
+            resetTransactionFormToAddMode();
+            renderTransactionTable(); // clears any row highlighting tied to the edit
         }
 
         // Shared by editTransaction() and copyTransaction(): reads back the
@@ -2150,6 +2216,31 @@
             }
         }
 
+        // Shared by editTransaction() and copyTransaction(): reads back the
+        // saved "addendum" display string (e.g. "Booking Fee: $15.00" or
+        // "Custom Addendum: $25.00") and re-populates the addendum controls.
+        function applyAddendumToForm(addendumDisplay) {
+            if (addendumDisplay && addendumDisplay !== "None" && addendumDisplay !== "N/A") {
+                document.getElementById('trans-addendum-toggle').checked = true;
+                toggleAddendumFields();
+                const split = addendumDisplay.split(': $');
+                if (split.length === 2) {
+                    const label = split[0];
+                    const isCustom = label === 'Custom Addendum';
+                    document.getElementById('trans-addendum-type').value = isCustom ? CUSTOM_ADDENDUM_VALUE : label;
+                    autoFillAddendumAmount();
+                    if (isCustom) {
+                        // autoFillAddendumAmount() clears the field for a
+                        // fresh custom entry — restore the saved amount here.
+                        document.getElementById('trans-addendum-val').value = parseFloat(split[1]);
+                    }
+                }
+            } else {
+                document.getElementById('trans-addendum-toggle').checked = false;
+                toggleAddendumFields();
+            }
+        }
+
         function editTransaction(id) {
             const t = transactions.find(item => item.id === id);
             if (!t) return;
@@ -2171,19 +2262,7 @@
             document.getElementById('trans-qty').value = Math.abs(t.qty);
 
             applyDiscountToForm(t.discount);
-
-            if (t.addendum && t.addendum !== "None" && t.addendum !== "N/A") {
-                document.getElementById('trans-addendum-toggle').checked = true;
-                toggleAddendumFields();
-                const split = t.addendum.split(': $');
-                if (split.length === 2) {
-                    document.getElementById('trans-addendum-type').value = split[0];
-                    document.getElementById('trans-addendum-val').value = parseFloat(split[1]);
-                }
-            } else {
-                document.getElementById('trans-addendum-toggle').checked = false;
-                toggleAddendumFields();
-            }
+            applyAddendumToForm(t.addendum);
 
             calculateTotal();
             document.getElementById('trans-payment').value = t.payment;
@@ -2194,12 +2273,14 @@
             btn.innerText = "Save Changes";
             btn.style.backgroundColor = "#f0ad4e";
             btn.style.color = "black";
+            document.getElementById('btn-cancel-transaction').style.display = 'inline-block';
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function copyTransaction(id) {
-            editingTransactionId = null; 
+            editingTransactionId = null;
+            isCopyPending = true;
             const index = transactions.findIndex(t => t.id === id);
             const t = transactions[index];
             
@@ -2222,23 +2303,11 @@
             document.getElementById('trans-qty').value = Math.abs(t.qty);
             
             applyDiscountToForm(t.discount);
-
-            if (t.addendum && t.addendum !== "None") {
-                document.getElementById('trans-addendum-toggle').checked = true;
-                toggleAddendumFields();
-                const split = t.addendum.split(': $');
-                if (split.length === 2) {
-                    document.getElementById('trans-addendum-type').value = split[0];
-                    document.getElementById('trans-addendum-val').value = parseFloat(split[1]);
-                }
-            } else {
-                document.getElementById('trans-addendum-toggle').checked = false;
-                toggleAddendumFields();
-            }
+            applyAddendumToForm(t.addendum);
 
             calculateTotal();
             document.getElementById('trans-payment').value = t.payment;
-            
+
             let cleanNotes = t.notes || "";
             cleanNotes = cleanNotes.replace(/Refunded:.*?(\||$)/g, '').trim();
             if (cleanNotes.endsWith('|')) cleanNotes = cleanNotes.slice(0, -1).trim();
@@ -2249,7 +2318,8 @@
             btn.innerText = "Log Copied Transaction";
             btn.style.backgroundColor = "#f0ad4e";
             btn.style.color = "black";
-            
+            document.getElementById('btn-cancel-transaction').style.display = 'inline-block';
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -2382,15 +2452,31 @@
             }
         }
 
+        // Per Troy: the Transaction History search box should be a broad
+        // "any field" search (patient name, notes, product, etc.) rather
+        // than matching only on customer name.
+        function transactionMatchesSearch(t, term) {
+            const haystack = [
+                t.id, t.customer, t.productName, t.notes, t.discount, t.addendum,
+                t.payment, t.location, t.date, t.price, t.qty, t.total,
+            ].filter((v) => v !== undefined && v !== null)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(term);
+        }
+
         function renderTransactionTable() {
             const tbody = document.querySelector('#transaction-table tbody');
             const selectedMonth = document.getElementById('month-filter').value;
-            const customerSearchTerm = document.getElementById('customer-filter-input').value.trim().toLowerCase();
-            
+            const dayFilterEl = document.getElementById('day-filter');
+            const selectedDay = dayFilterEl ? dayFilterEl.value : '';
+            const searchTerm = document.getElementById('customer-filter-input').value.trim().toLowerCase();
+
             const rowsHTML = transactions.filter(t => {
                 const transMonth = t.date ? t.date.substring(0, 7) : 'Invalid Date';
-                if (selectedMonth !== "ALL" && transMonth !== selectedMonth) return false; 
-                if (customerSearchTerm !== "" && !t.customer.toLowerCase().includes(customerSearchTerm)) return false;
+                if (selectedMonth !== "ALL" && transMonth !== selectedMonth) return false;
+                if (selectedDay && t.date !== selectedDay) return false;
+                if (searchTerm !== "" && !transactionMatchesSearch(t, searchTerm)) return false;
                 return true;
             }).map(t => {
                 const rowClass = t.isRefund ? 'refund-row' : '';
