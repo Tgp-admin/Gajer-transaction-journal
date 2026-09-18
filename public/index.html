@@ -181,6 +181,16 @@
             color: #777777;
         }
 
+        /* Front desk asked for an easy visual flag on anything still owed —
+           a soft purple so it stands out from the normal rows and the
+           greyed-out refund rows without looking like an error/warning color. */
+        .not-collected-row {
+            background-color: #ede7f6;
+        }
+        .not-collected-row:hover {
+            background-color: #ddd3f0;
+        }
+
         /* Filter Controls */
         .table-controls {
             display: flex;
@@ -2479,7 +2489,10 @@
                 if (searchTerm !== "" && !transactionMatchesSearch(t, searchTerm)) return false;
                 return true;
             }).map(t => {
-                const rowClass = t.isRefund ? 'refund-row' : '';
+                // A refund is already resolved, so that styling wins if both
+                // somehow apply; otherwise flag anything still marked "Not
+                // Collected" so front desk can scan for follow-ups at a glance.
+                const rowClass = t.isRefund ? 'refund-row' : ((t.payment || '').trim().toLowerCase() === 'not collected' ? 'not-collected-row' : '');
                 const isChecked = selectedTransactionIds.has(t.id) ? 'checked' : '';
                 const locStr = t.location || 'Burke';
                 const locBadge = `<span style="background-color: ${locStr === 'Vienna' ? '#dcb5b2' : '#f4e6e5'}; padding: 3px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; border: 1px solid #d4b8b5;">${locStr}</span>`;
